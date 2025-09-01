@@ -20,6 +20,7 @@ from controllers.console.wraps import (
     cloud_edition_billing_resource_check,
     setup_required,
 )
+from extensions.ext_database import db
 from fields.file_fields import file_fields, upload_config_fields
 from libs.login import login_required
 from services.file_service import FileService
@@ -68,7 +69,7 @@ class FileApi(Resource):
             source = None
 
         try:
-            upload_file = FileService.upload_file(
+            upload_file = FileService(db.engine).upload_file(
                 filename=file.filename,
                 content=file.read(),
                 mimetype=file.mimetype,
@@ -89,7 +90,7 @@ class FilePreviewApi(Resource):
     @account_initialization_required
     def get(self, file_id):
         file_id = str(file_id)
-        text = FileService.get_file_preview(file_id)
+        text = FileService(db.engine).get_file_preview(file_id)
         return {"content": text}
 
 

@@ -164,7 +164,9 @@ Toast.notify = ({
       </ToastContext.Provider>,
     )
     document.body.appendChild(holder)
-    setTimeout(toastHandler.clear, duration || defaultDuring)
+    const d = duration ?? defaultDuring
+    if (d > 0)
+      setTimeout(toastHandler.clear, d)
   }
 
   return toastHandler

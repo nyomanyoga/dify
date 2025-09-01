@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Optional, Union
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.app.entities.app_invoke_entities import AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity
@@ -41,16 +40,14 @@ from core.tools.entities.tool_entities import ToolProviderType
 from core.tools.tool_manager import ToolManager
 from core.variables.segments import ArrayFileSegment, FileSegment, Segment
 from core.workflow.entities import WorkflowExecution, WorkflowNodeExecution
-from core.workflow.enums import WorkflowNodeExecutionStatus
-from core.workflow.nodes import NodeType
+from core.workflow.enums import NodeType, WorkflowNodeExecutionStatus
 from core.workflow.workflow_type_encoder import WorkflowRuntimeTypeConverter
 from libs.datetime_utils import naive_utc_now
 from models import (
     Account,
-    CreatorUserRole,
     EndUser,
-    WorkflowRun,
 )
+from services.variable_truncator import VariableTruncator
 
 
 class WorkflowResponseConverter:
@@ -58,8 +55,11 @@ class WorkflowResponseConverter:
         self,
         *,
         application_generate_entity: Union[AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity],
+        user: Union[Account, EndUser],
     ) -> None:
         self._application_generate_entity = application_generate_entity
+        self._user = user
+        self._truncator = VariableTruncator.default()
 
     def workflow_start_to_stream_response(
         self,
@@ -86,27 +86,21 @@ class WorkflowResponseConverter:
         workflow_execution: WorkflowExecution,
     ) -> WorkflowFinishStreamResponse:
         created_by = None
-        workflow_run = session.scalar(select(WorkflowRun).where(WorkflowRun.id == workflow_execution.id_))
-        assert workflow_run is not None
-        if workflow_run.created_by_role == CreatorUserRole.ACCOUNT:
-            stmt = select(Account).where(Account.id == workflow_run.created_by)
-            account = session.scalar(stmt)
-            if account:
-                created_by = {
-                    "id": account.id,
-                    "name": account.name,
-                    "email": account.email,
-                }
-        elif workflow_run.created_by_role == CreatorUserRole.END_USER:
-            stmt = select(EndUser).where(EndUser.id == workflow_run.created_by)
-            end_user = session.scalar(stmt)
-            if end_user:
-                created_by = {
-                    "id": end_user.id,
-                    "user": end_user.session_id,
-                }
+
+        user = self._user
+        if isinstance(user, Account):
+            created_by = {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+            }
+        elif isinstance(user, EndUser):
+            created_by = {
+                "id": user.id,
+                "user": user.session_id,
+            }
         else:
-            raise NotImplementedError(f"unknown created_by_role: {workflow_run.created_by_role}")
+            raise NotImplementedError(f"User type not supported: {type(user)}")
 
         # Handle the case where finished_at is None by using current time as default
         finished_at_timestamp = (
@@ -157,7 +151,8 @@ class WorkflowResponseConverter:
                 title=workflow_node_execution.title,
                 index=workflow_node_execution.index,
                 predecessor_node_id=workflow_node_execution.predecessor_node_id,
-                inputs=workflow_node_execution.inputs,
+                inputs=workflow_node_execution.get_response_inputs(),
+                inputs_truncated=workflow_node_execution.inputs_truncated,
                 created_at=int(workflow_node_execution.created_at.timestamp()),
                 parallel_id=event.parallel_id,
                 parallel_start_node_id=event.parallel_start_node_id,
@@ -213,9 +208,12 @@ class WorkflowResponseConverter:
                 index=workflow_node_execution.index,
                 title=workflow_node_execution.title,
                 predecessor_node_id=workflow_node_execution.predecessor_node_id,
-                inputs=workflow_node_execution.inputs,
-                process_data=workflow_node_execution.process_data,
-                outputs=json_converter.to_json_encodable(workflow_node_execution.outputs),
+                inputs=workflow_node_execution.get_response_inputs(),
+                inputs_truncated=workflow_node_execution.inputs_truncated,
+                process_data=workflow_node_execution.get_response_process_data(),
+                process_data_truncated=workflow_node_execution.process_data_truncated,
+                outputs=json_converter.to_json_encodable(workflow_node_execution.get_response_outputs()),
+                outputs_truncated=workflow_node_execution.outputs_truncated,
                 status=workflow_node_execution.status,
                 error=workflow_node_execution.error,
                 elapsed_time=workflow_node_execution.elapsed_time,
@@ -255,9 +253,12 @@ class WorkflowResponseConverter:
                 index=workflow_node_execution.index,
                 title=workflow_node_execution.title,
                 predecessor_node_id=workflow_node_execution.predecessor_node_id,
-                inputs=workflow_node_execution.inputs,
-                process_data=workflow_node_execution.process_data,
-                outputs=json_converter.to_json_encodable(workflow_node_execution.outputs),
+                inputs=workflow_node_execution.get_response_inputs(),
+                inputs_truncated=workflow_node_execution.inputs_truncated,
+                process_data=workflow_node_execution.get_response_process_data(),
+                process_data_truncated=workflow_node_execution.process_data_truncated,
+                outputs=json_converter.to_json_encodable(workflow_node_execution.get_response_outputs()),
+                outputs_truncated=workflow_node_execution.outputs_truncated,
                 status=workflow_node_execution.status,
                 error=workflow_node_execution.error,
                 elapsed_time=workflow_node_execution.elapsed_time,
@@ -282,6 +283,7 @@ class WorkflowResponseConverter:
         workflow_execution_id: str,
         event: QueueIterationStartEvent,
     ) -> IterationNodeStartStreamResponse:
+        new_inputs, truncated = self._truncator.truncate_variable_mapping(event.inputs or {})
         return IterationNodeStartStreamResponse(
             task_id=task_id,
             workflow_run_id=workflow_execution_id,
@@ -292,7 +294,8 @@ class WorkflowResponseConverter:
                 title=event.node_title,
                 created_at=int(time.time()),
                 extras={},
-                inputs=event.inputs or {},
+                inputs=new_inputs,
+                inputs_truncated=truncated,
                 metadata=event.metadata or {},
             ),
         )
@@ -326,6 +329,11 @@ class WorkflowResponseConverter:
         event: QueueIterationCompletedEvent,
     ) -> IterationNodeCompletedStreamResponse:
         json_converter = WorkflowRuntimeTypeConverter()
+
+        new_inputs, inputs_truncated = self._truncator.truncate_variable_mapping(event.inputs or {})
+        new_outputs, outputs_truncated = self._truncator.truncate_variable_mapping(
+            json_converter.to_json_encodable(event.outputs) or {}
+        )
         return IterationNodeCompletedStreamResponse(
             task_id=task_id,
             workflow_run_id=workflow_execution_id,
@@ -334,10 +342,12 @@ class WorkflowResponseConverter:
                 node_id=event.node_id,
                 node_type=event.node_type.value,
                 title=event.node_title,
-                outputs=json_converter.to_json_encodable(event.outputs),
+                outputs=new_outputs,
+                outputs_truncated=outputs_truncated,
                 created_at=int(time.time()),
                 extras={},
-                inputs=event.inputs or {},
+                inputs=new_inputs,
+                inputs_truncated=inputs_truncated,
                 status=WorkflowNodeExecutionStatus.SUCCEEDED
                 if event.error is None
                 else WorkflowNodeExecutionStatus.FAILED,
@@ -353,6 +363,7 @@ class WorkflowResponseConverter:
     def workflow_loop_start_to_stream_response(
         self, *, task_id: str, workflow_execution_id: str, event: QueueLoopStartEvent
     ) -> LoopNodeStartStreamResponse:
+        new_inputs, truncated = self._truncator.truncate_variable_mapping(event.inputs or {})
         return LoopNodeStartStreamResponse(
             task_id=task_id,
             workflow_run_id=workflow_execution_id,
@@ -363,7 +374,8 @@ class WorkflowResponseConverter:
                 title=event.node_title,
                 created_at=int(time.time()),
                 extras={},
-                inputs=event.inputs or {},
+                inputs=new_inputs,
+                inputs_truncated=truncated,
                 metadata=event.metadata or {},
                 parallel_id=event.parallel_id,
                 parallel_start_node_id=event.parallel_start_node_id,
@@ -386,7 +398,9 @@ class WorkflowResponseConverter:
                 node_type=event.node_type.value,
                 title=event.node_title,
                 index=event.index,
-                pre_loop_output=event.output,
+                # The `pre_loop_output` field is not utilized by the frontend.
+                # Previously, it was assigned the value of `event.output`.
+                pre_loop_output={},
                 created_at=int(time.time()),
                 extras={},
                 parallel_id=event.parallel_id,
@@ -402,6 +416,11 @@ class WorkflowResponseConverter:
         workflow_execution_id: str,
         event: QueueLoopCompletedEvent,
     ) -> LoopNodeCompletedStreamResponse:
+        json_converter = WorkflowRuntimeTypeConverter()
+        new_inputs, inputs_truncated = self._truncator.truncate_variable_mapping(event.inputs or {})
+        new_outputs, outputs_truncated = self._truncator.truncate_variable_mapping(
+            json_converter.to_json_encodable(event.outputs) or {}
+        )
         return LoopNodeCompletedStreamResponse(
             task_id=task_id,
             workflow_run_id=workflow_execution_id,
@@ -410,10 +429,12 @@ class WorkflowResponseConverter:
                 node_id=event.node_id,
                 node_type=event.node_type.value,
                 title=event.node_title,
-                outputs=WorkflowRuntimeTypeConverter().to_json_encodable(event.outputs),
+                outputs=new_outputs,
+                outputs_truncated=outputs_truncated,
                 created_at=int(time.time()),
                 extras={},
-                inputs=event.inputs or {},
+                inputs=new_inputs,
+                inputs_truncated=inputs_truncated,
                 status=WorkflowNodeExecutionStatus.SUCCEEDED
                 if event.error is None
                 else WorkflowNodeExecutionStatus.FAILED,

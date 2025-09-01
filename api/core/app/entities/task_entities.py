@@ -258,6 +258,7 @@ class NodeStartStreamResponse(StreamResponse):
         index: int
         predecessor_node_id: Optional[str] = None
         inputs: Optional[Mapping[str, Any]] = None
+        inputs_truncated: bool = False
         created_at: int
         extras: dict = Field(default_factory=dict)
         parallel_id: Optional[str] = None
@@ -315,8 +316,11 @@ class NodeFinishStreamResponse(StreamResponse):
         index: int
         predecessor_node_id: Optional[str] = None
         inputs: Optional[Mapping[str, Any]] = None
+        inputs_truncated: bool = False
         process_data: Optional[Mapping[str, Any]] = None
+        process_data_truncated: bool = False
         outputs: Optional[Mapping[str, Any]] = None
+        outputs_truncated: bool = True
         status: str
         error: Optional[str] = None
         elapsed_time: float
@@ -384,8 +388,11 @@ class NodeRetryStreamResponse(StreamResponse):
         index: int
         predecessor_node_id: Optional[str] = None
         inputs: Optional[Mapping[str, Any]] = None
+        inputs_truncated: bool = False
         process_data: Optional[Mapping[str, Any]] = None
+        process_data_truncated: bool = False
         outputs: Optional[Mapping[str, Any]] = None
+        outputs_truncated: bool = False
         status: str
         error: Optional[str] = None
         elapsed_time: float
@@ -456,6 +463,7 @@ class IterationNodeStartStreamResponse(StreamResponse):
         extras: dict = Field(default_factory=dict)
         metadata: Mapping = {}
         inputs: Mapping = {}
+        inputs_truncated: bool = False
 
     event: StreamEvent = StreamEvent.ITERATION_STARTED
     workflow_run_id: str
@@ -500,9 +508,11 @@ class IterationNodeCompletedStreamResponse(StreamResponse):
         node_type: str
         title: str
         outputs: Optional[Mapping] = None
+        outputs_truncated: bool = False
         created_at: int
         extras: Optional[dict] = None
         inputs: Optional[Mapping] = None
+        inputs_truncated: bool = False
         status: WorkflowNodeExecutionStatus
         error: Optional[str] = None
         elapsed_time: float
@@ -534,6 +544,7 @@ class LoopNodeStartStreamResponse(StreamResponse):
         extras: dict = Field(default_factory=dict)
         metadata: Mapping = {}
         inputs: Mapping = {}
+        inputs_truncated: bool = False
         parallel_id: Optional[str] = None
         parallel_start_node_id: Optional[str] = None
 
@@ -584,9 +595,11 @@ class LoopNodeCompletedStreamResponse(StreamResponse):
         node_type: str
         title: str
         outputs: Optional[Mapping] = None
+        outputs_truncated: bool = False
         created_at: int
         extras: Optional[dict] = None
         inputs: Optional[Mapping] = None
+        inputs_truncated: bool = False
         status: WorkflowNodeExecutionStatus
         error: Optional[str] = None
         elapsed_time: float

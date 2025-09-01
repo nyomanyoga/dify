@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import uuid4
 
 import sqlalchemy as sa
-from sqlalchemy import DateTime, exists, orm, select
+from sqlalchemy import DateTime, Select, exists, orm, select
 
 from core.file.constants import maybe_file_object
 from core.file.models import File
@@ -15,13 +15,15 @@ from core.variables import utils as variable_utils
 from core.variables.variables import FloatVariable, IntegerVariable, StringVariable
 from core.workflow.constants import CONVERSATION_VARIABLE_NODE_ID, SYSTEM_VARIABLE_NODE_ID
 from core.workflow.enums import NodeType
+from extensions.ext_storage import Storage
 from factories.variable_factory import TypeMismatchError, build_segment_with_type
 from libs.datetime_utils import naive_utc_now
+from libs.uuid_utils import uuidv7
 
 from ._workflow_exc import NodeNotFoundError, WorkflowDataError
 
 if TYPE_CHECKING:
-    from models.model import AppMode
+    from models.model import AppMode, UploadFile
 
 from sqlalchemy import Index, PrimaryKeyConstraint, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
@@ -35,7 +37,7 @@ from libs import helper
 from .account import Account
 from .base import Base
 from .engine import db
-from .enums import CreatorUserRole, DraftVariableType
+from .enums import CreatorUserRole, DraftVariableType, ExecutionOffLoadType
 from .types import EnumText, StringUUID
 
 logger = logging.getLogger(__name__)
@@ -642,7 +644,7 @@ class WorkflowNodeExecutionTriggeredFrom(StrEnum):
     RAG_PIPELINE_RUN = "rag-pipeline-run"
 
 
-class WorkflowNodeExecutionModel(Base):
+class WorkflowNodeExecutionModel(Base):  # This model is expected to have `offload_data` preloaded in most cases.
     """
     Workflow Node Execution
 
@@ -758,6 +760,32 @@ class WorkflowNodeExecutionModel(Base):
     created_by: Mapped[str] = mapped_column(StringUUID)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    offload_data: Mapped[list["WorkflowNodeExecutionOffload"]] = orm.relationship(
+        "WorkflowNodeExecutionOffload",
+        primaryjoin="WorkflowNodeExecutionModel.id == foreign(WorkflowNodeExecutionOffload.node_execution_id)",
+        uselist=True,
+        lazy="raise",
+        back_populates="execution",
+    )
+
+    @staticmethod
+    def preload_offload_data(
+        query: Select[tuple["WorkflowNodeExecutionModel"]] | orm.Query["WorkflowNodeExecutionModel"],
+    ):
+        return query.options(orm.selectinload(WorkflowNodeExecutionModel.offload_data))
+
+    @staticmethod
+    def preload_offload_data_and_files(
+        query: Select[tuple["WorkflowNodeExecutionModel"]] | orm.Query["WorkflowNodeExecutionModel"],
+    ):
+        return query.options(
+            orm.selectinload(WorkflowNodeExecutionModel.offload_data).options(
+                # Using `joinedload` instead of `selectinload` to minimize database roundtrips,
+                # as `selectinload` would require separate queries for `inputs_file` and `outputs_file`.
+                orm.selectinload(WorkflowNodeExecutionOffload.file),
+            )
+        )
+
     @property
     def created_by_account(self):
         created_by_role = CreatorUserRole(self.created_by_role)
@@ -808,6 +836,121 @@ class WorkflowNodeExecutionModel(Base):
                 )
 
         return extras
+
+    def _get_offload_by_type(self, type_: ExecutionOffLoadType) -> Optional["WorkflowNodeExecutionOffload"]:
+        return next(iter([i for i in self.offload_data if i.type_ == type_]), None)
+
+    @property
+    def inputs_truncated(self) -> bool:
+        """Check if inputs were truncated (offloaded to external storage)."""
+        return self._get_offload_by_type(ExecutionOffLoadType.INPUTS) is not None
+
+    @property
+    def outputs_truncated(self) -> bool:
+        """Check if outputs were truncated (offloaded to external storage)."""
+        return self._get_offload_by_type(ExecutionOffLoadType.OUTPUTS) is not None
+
+    @property
+    def process_data_truncated(self) -> bool:
+        """Check if process_data were truncated (offloaded to external storage)."""
+        return self._get_offload_by_type(ExecutionOffLoadType.PROCESS_DATA) is not None
+
+    @staticmethod
+    def _load_full_content(session: orm.Session, file_id: str, storage: Storage):
+        from .model import UploadFile
+
+        stmt = sa.select(UploadFile).where(UploadFile.id == file_id)
+        file = session.scalars(stmt).first()
+        assert file is not None, f"UploadFile with id {file_id} should exist but not"
+        content = storage.load(file.key)
+        return json.loads(content)
+
+    def load_full_inputs(self, session: orm.Session, storage: Storage) -> Mapping[str, Any] | None:
+        offload = self._get_offload_by_type(ExecutionOffLoadType.INPUTS)
+        if offload is None:
+            return self.inputs_dict
+
+        return self._load_full_content(session, offload.file_id, storage)
+
+    def load_full_outputs(self, session: orm.Session, storage: Storage) -> Mapping[str, Any] | None:
+        offload: WorkflowNodeExecutionOffload | None = self._get_offload_by_type(ExecutionOffLoadType.OUTPUTS)
+        if offload is None:
+            return self.outputs_dict
+
+        return self._load_full_content(session, offload.file_id, storage)
+
+    def load_full_process_data(self, session: orm.Session, storage: Storage) -> Mapping[str, Any] | None:
+        offload: WorkflowNodeExecutionOffload | None = self._get_offload_by_type(ExecutionOffLoadType.PROCESS_DATA)
+        if offload is None:
+            return self.process_data_dict
+
+        return self._load_full_content(session, offload.file_id, storage)
+
+
+class WorkflowNodeExecutionOffload(Base):
+    __tablename__ = "workflow_node_execution_offload"
+    __table_args__ = (
+        UniqueConstraint(
+            "node_execution_id",
+            "type",
+            # Treat `NULL` as distinct for this unique index, so
+            # we can have mutitple records with `NULL` node_exeution_id, simplify garbage collection process.
+            postgresql_nulls_not_distinct=False,
+        ),
+    )
+    _HASH_COL_SIZE = 64
+
+    id: Mapped[str] = mapped_column(
+        StringUUID,
+        primary_key=True,
+        server_default=sa.text("uuidv7()"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=naive_utc_now, server_default=func.current_timestamp()
+    )
+
+    tenant_id: Mapped[str] = mapped_column(StringUUID)
+    app_id: Mapped[str] = mapped_column(StringUUID)
+
+    # `node_execution_id` indicates the `WorkflowNodeExecutionModel` associated with this offload record.
+    # A value of `None` signifies that this offload record is not linked to any execution record
+    # and should be considered for garbage collection.
+    node_execution_id: Mapped[str | None] = mapped_column(StringUUID, nullable=True)
+    type_: Mapped[ExecutionOffLoadType] = mapped_column(EnumText(ExecutionOffLoadType), name="type", nullable=False)
+
+    # Design Decision: Combining inputs and outputs into a single object was considered to reduce I/O
+    # operations. However, due to the current design of `WorkflowNodeExecutionRepository`,
+    # the `save` method is called at two distinct times:
+    #
+    # - When the node starts execution: the `inputs` field exists, but the `outputs` field is absent
+    # - When the node completes execution (either succeeded or failed): the `outputs` field becomes available
+    #
+    # It's difficult to correlate these two successive calls to `save` for combined storage.
+    # Converting the `WorkflowNodeExecutionRepository` to buffer the first `save` call and flush
+    # when execution completes was also considered, but this would make the execution state unobservable
+    # until completion, significantly damaging the observability of workflow execution.
+    #
+    # Given these constraints, `inputs` and `outputs` are stored separately to maintain real-time
+    # observability and system reliability.
+
+    # `file_id` references to the offloaded storage object containing the data.
+    file_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
+
+    execution: Mapped[WorkflowNodeExecutionModel] = orm.relationship(
+        foreign_keys=[node_execution_id],
+        lazy="raise",
+        uselist=False,
+        primaryjoin="WorkflowNodeExecutionOffload.node_execution_id == WorkflowNodeExecutionModel.id",
+        back_populates="offload_data",
+    )
+
+    file: Mapped[Optional["UploadFile"]] = orm.relationship(
+        foreign_keys=[file_id],
+        lazy="raise",
+        uselist=False,
+        primaryjoin="WorkflowNodeExecutionOffload.file_id == UploadFile.id",
+    )
 
 
 class WorkflowAppLogCreatedFrom(Enum):
@@ -971,7 +1114,10 @@ class WorkflowDraftVariable(Base):
         ]
 
     __tablename__ = "workflow_draft_variables"
-    __table_args__ = (UniqueConstraint(*unique_app_id_node_id_name()),)
+    __table_args__ = (
+        UniqueConstraint(*unique_app_id_node_id_name()),
+        Index("workflow_draft_variable_file_id_idx", "file_id"),
+    )
     # Required for instance variable annotation.
     __allow_unmapped__ = True
 
@@ -1032,9 +1178,16 @@ class WorkflowDraftVariable(Base):
     selector: Mapped[str] = mapped_column(sa.String(255), nullable=False, name="selector")
 
     # The data type of this variable's value
+    #
+    # If the variable is offloaded, `value_type` represents the type of the truncated value,
+    # which may differ from the original value's type. Typically, they are the same,
+    # but in cases where the structurally truncated  value still exceeds the size limit,
+    # text slicing is applied, and the `value_type` is converted to `STRING`.
     value_type: Mapped[SegmentType] = mapped_column(EnumText(SegmentType, length=20))
 
     # The variable's value serialized as a JSON string
+    #
+    # If the variable is offloaded, `value` contains a truncated version, not the full original value.
     value: Mapped[str] = mapped_column(sa.Text, nullable=False, name="value")
 
     # Controls whether the variable should be displayed in the variable inspection panel
@@ -1052,6 +1205,35 @@ class WorkflowDraftVariable(Base):
         StringUUID,
         nullable=True,
         default=None,
+    )
+
+    # Reference to WorkflowDraftVariableFile for offloaded large variables
+    #
+    # Indicates whether the current draft variable is offloaded.
+    # If not offloaded, this field will be None.
+    file_id: Mapped[str | None] = mapped_column(
+        StringUUID,
+        nullable=True,
+        default=None,
+        comment="Reference to WorkflowDraftVariableFile if variable is offloaded to external storage",
+    )
+
+    is_default_value: Mapped[bool] = mapped_column(
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        comment=(
+            "Indicates whether the current value is the default for a conversation variable. "
+            "Always `FALSE` for other types of variables."
+        ),
+    )
+
+    # Relationship to WorkflowDraftVariableFile
+    variable_file: Mapped[Optional["WorkflowDraftVariableFile"]] = orm.relationship(
+        foreign_keys=[file_id],
+        lazy="raise",
+        uselist=False,
+        primaryjoin="WorkflowDraftVariableFile.id == WorkflowDraftVariable.file_id",
     )
 
     # Cache for deserialized value
@@ -1201,6 +1383,9 @@ class WorkflowDraftVariable(Base):
             case _:
                 return DraftVariableType.NODE
 
+    def is_truncated(self) -> bool:
+        return self.file_id is not None
+
     @classmethod
     def _new(
         cls,
@@ -1211,6 +1396,7 @@ class WorkflowDraftVariable(Base):
         value: Segment,
         node_execution_id: str | None,
         description: str = "",
+        file_id: str | None = None,
     ) -> "WorkflowDraftVariable":
         variable = WorkflowDraftVariable()
         variable.created_at = _naive_utc_datetime()
@@ -1220,6 +1406,7 @@ class WorkflowDraftVariable(Base):
         variable.node_id = node_id
         variable.name = name
         variable.set_value(value)
+        variable.file_id = file_id
         variable._set_selector(list(variable_utils.to_selector(node_id, name)))
         variable.node_execution_id = node_execution_id
         return variable
@@ -1275,6 +1462,7 @@ class WorkflowDraftVariable(Base):
         node_execution_id: str,
         visible: bool = True,
         editable: bool = True,
+        file_id: str | None = None,
     ) -> "WorkflowDraftVariable":
         variable = cls._new(
             app_id=app_id,
@@ -1282,6 +1470,7 @@ class WorkflowDraftVariable(Base):
             name=name,
             node_execution_id=node_execution_id,
             value=value,
+            file_id=file_id,
         )
         variable.visible = visible
         variable.editable = editable
@@ -1290,6 +1479,93 @@ class WorkflowDraftVariable(Base):
     @property
     def edited(self):
         return self.last_edited_at is not None
+
+
+class WorkflowDraftVariableFile(Base):
+    """Stores metadata about files associated with large workflow draft variables.
+
+    This model acts as an intermediary between WorkflowDraftVariable and UploadFile,
+    allowing for proper cleanup of orphaned files when variables are updated or deleted.
+
+    The MIME type of the stored content is recorded in `UploadFile.mime_type`.
+    Possible values are 'application/json' for JSON types other than plain text,
+    and 'text/plain' for JSON strings.
+    """
+
+    __tablename__ = "workflow_draft_variable_files"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        StringUUID,
+        primary_key=True,
+        default=uuidv7,
+        server_default=sa.text("uuidv7()"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=_naive_utc_datetime,
+        server_default=func.current_timestamp(),
+    )
+
+    tenant_id: Mapped[str] = mapped_column(
+        StringUUID,
+        nullable=False,
+        comment="The tenant to which the WorkflowDraftVariableFile belongs, referencing Tenant.id",
+    )
+
+    app_id: Mapped[str] = mapped_column(
+        StringUUID,
+        nullable=False,
+        comment="The application to which the WorkflowDraftVariableFile belongs, referencing App.id",
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        StringUUID,
+        nullable=False,
+        comment="The owner to of the WorkflowDraftVariableFile, referencing Account.id",
+    )
+
+    # Reference to the `UploadFile.id` field
+    upload_file_id: Mapped[str] = mapped_column(
+        StringUUID,
+        nullable=False,
+        comment="Reference to UploadFile containing the large variable data",
+    )
+
+    # -------------- metadata about the variable content --------------
+
+    # The `size` is already recorded in UploadFiles. It is duplicated here to avoid an additional database lookup.
+    size: Mapped[int | None] = mapped_column(
+        sa.BigInteger,
+        nullable=False,
+        comment="Size of the original variable content in bytes",
+    )
+
+    length: Mapped[Optional[int]] = mapped_column(
+        sa.Integer,
+        nullable=True,
+        comment=(
+            "Length of the original variable content. For array and array-like types, "
+            "this represents the number of elements. For object types, it indicates the number of keys. "
+            "For other types, the value is NULL."
+        ),
+    )
+
+    # The `value_type` field records the type of the original value.
+    value_type: Mapped[SegmentType] = mapped_column(
+        EnumText(SegmentType, length=20),
+        nullable=False,
+    )
+
+    # Relationship to UploadFile
+    upload_file: Mapped["UploadFile"] = orm.relationship(
+        foreign_keys=[upload_file_id],
+        lazy="raise",
+        uselist=False,
+        primaryjoin="WorkflowDraftVariableFile.upload_file_id == UploadFile.id",
+    )
 
 
 def is_system_variable_editable(name: str) -> bool:

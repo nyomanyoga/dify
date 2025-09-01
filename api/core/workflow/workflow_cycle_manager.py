@@ -190,6 +190,7 @@ class WorkflowCycleManager:
         )
 
         self._workflow_node_execution_repository.save(domain_execution)
+        self._workflow_node_execution_repository.save_execution_data(domain_execution)
         return domain_execution
 
     def handle_workflow_node_execution_failed(
@@ -219,6 +220,7 @@ class WorkflowCycleManager:
         )
 
         self._workflow_node_execution_repository.save(domain_execution)
+        self._workflow_node_execution_repository.save_execution_data(domain_execution)
         return domain_execution
 
     def handle_workflow_node_execution_retried(
@@ -241,7 +243,9 @@ class WorkflowCycleManager:
 
         domain_execution.update_from_mapping(inputs=inputs, outputs=outputs, metadata=metadata)
 
-        return self._save_and_cache_node_execution(domain_execution)
+        execution = self._save_and_cache_node_execution(domain_execution)
+        self._workflow_node_execution_repository.save_execution_data(execution)
+        return execution
 
     def _get_workflow_execution_or_raise_error(self, id: str, /) -> WorkflowExecution:
         # Check cache first
@@ -274,7 +278,10 @@ class WorkflowCycleManager:
         return execution
 
     def _save_and_cache_node_execution(self, execution: WorkflowNodeExecution) -> WorkflowNodeExecution:
-        """Save node execution to repository and cache it if it has an ID."""
+        """Save node execution to repository and cache it if it has an ID.
+
+        This does not persist the `inputs` / `process_data` / `outputs` fields of the execution model.
+        """
         self._workflow_node_execution_repository.save(execution)
         if execution.node_execution_id:
             self._node_execution_cache[execution.node_execution_id] = execution

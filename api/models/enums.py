@@ -32,3 +32,9 @@ class MessageStatus(StrEnum):
 
     NORMAL = "normal"
     ERROR = "error"
+
+
+class ExecutionOffLoadType(StrEnum):
+    INPUTS = "inputs"
+    PROCESS_DATA = "process_data"
+    OUTPUTS = "outputs"
