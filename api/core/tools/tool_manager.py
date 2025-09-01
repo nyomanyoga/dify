@@ -26,6 +26,12 @@ from core.tools.plugin_tool.tool import PluginTool
 from core.tools.utils.uuid_utils import is_valid_uuid
 from core.tools.workflow_as_tool.provider import WorkflowToolProviderController
 from core.workflow.entities.variable_pool import VariablePool
+from services.enterprise.plugin_manager_service import (
+    CheckCredentialPolicyComplianceRequest,
+    PluginCredentialType,
+    PluginManagerService,
+)
+from services.feature_service import FeatureService
 from services.tools.mcp_tools_manage_service import MCPToolManageService
 
 if TYPE_CHECKING:
@@ -54,9 +60,7 @@ from core.tools.entities.tool_entities import (
 )
 from core.tools.errors import ToolProviderNotFoundError
 from core.tools.tool_label_manager import ToolLabelManager
-from core.tools.utils.configuration import (
-    ToolParameterConfigurationManager,
-)
+from core.tools.utils.configuration import ToolParameterConfigurationManager
 from core.tools.utils.encryption import create_provider_encrypter, create_tool_provider_encrypter
 from core.tools.workflow_as_tool.tool import WorkflowTool
 from extensions.ext_database import db
@@ -238,6 +242,16 @@ class ToolManager:
 
                 if builtin_provider is None:
                     raise ToolProviderNotFoundError(f"builtin provider {provider_id} not found")
+
+            # check if the credential is allowed to be used
+            if FeatureService.get_system_features().plugin_manager.enabled:
+                PluginManagerService.check_credential_policy_compliance(
+                    CheckCredentialPolicyComplianceRequest(
+                        dify_credential_id=builtin_provider.id,
+                        provider=provider_id,
+                        credential_type=PluginCredentialType.TOOL,
+                    )
+                )
 
             encrypter, cache = create_provider_encrypter(
                 tenant_id=tenant_id,
