@@ -9,9 +9,12 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, TypeVar, Union
 
+import psycopg2.errors
 from sqlalchemy import UnaryExpression, asc, desc, select
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
+from tenacity import before_sleep_log, retry, retry_if_exception, stop_after_attempt
 
 from configs import dify_config
 from core.model_runtime.utils.encoders import jsonable_encoder
@@ -262,45 +265,20 @@ class SQLAlchemyWorkflowNodeExecutionRepository(WorkflowNodeExecutionRepository)
 
         return db_model
 
-    def _truncate_and_upload(
-        self,
-        values: Mapping[str, Any] | None,
-        execution_id: str,
-        type_: ExecutionOffLoadType,
-    ) -> _InputsOutputsTruncationResult | None:
-        if values is None:
-            return None
+    def _is_duplicate_key_error(self, exception: BaseException) -> bool:
+        """Check if the exception is a duplicate key constraint violation."""
+        return isinstance(exception, IntegrityError) and isinstance(exception.orig, psycopg2.errors.UniqueViolation)
 
-        converter = WorkflowRuntimeTypeConverter()
-        json_encodable_value = converter.to_json_encodable(values)
-        truncator = self._create_truncator()
-        truncated_values, truncated = truncator.truncate_io_mapping(json_encodable_value)
-        if not truncated:
-            return None
-
-        value_json = _deterministic_json_dump(json_encodable_value)
-        assert value_json is not None, "value_json should be None here."
-
-        suffix = type_.value
-        upload_file = self._file_service.upload_file(
-            filename=f"node_execution_{execution_id}_{suffix}.json",
-            content=value_json.encode("utf-8"),
-            mimetype="application/json",
-            user=self._user,
+    def _regenerate_id_on_duplicate(
+        self, execution: WorkflowNodeExecution, db_model: WorkflowNodeExecutionModel
+    ) -> None:
+        """Regenerate UUID v7 for both domain and database models when duplicate key detected."""
+        new_id = str(uuidv7())
+        logger.warning(
+            "Duplicate key conflict for workflow node execution ID %s, generating new UUID v7: %s", db_model.id, new_id
         )
-        offload = WorkflowNodeExecutionOffload(
-            id=uuidv7(),
-            tenant_id=self._tenant_id,
-            app_id=self._app_id,
-            node_execution_id=execution_id,
-            type_=type_,
-            file_id=upload_file.id,
-        )
-        return _InputsOutputsTruncationResult(
-            truncated_value=truncated_values,
-            file=upload_file,
-            offload=offload,
-        )
+        db_model.id = new_id
+        execution.id = new_id
 
     def save(self, execution: WorkflowNodeExecution) -> None:
         """
@@ -308,13 +286,10 @@ class SQLAlchemyWorkflowNodeExecutionRepository(WorkflowNodeExecutionRepository)
 
         This method serves as a domain-to-database adapter that:
         1. Converts the domain entity to its database representation
-        2. Handles truncation and offloading of large inputs/outputs
-        3. Persists the database model using SQLAlchemy's merge operation
-        4. Maintains proper multi-tenancy by including tenant context during conversion
-        5. Updates the in-memory cache for faster subsequent lookups
-
-        The method handles both creating new records and updating existing ones through
-        SQLAlchemy's merge operation.
+        2. Checks for existing records and updates or inserts accordingly
+        3. Maintains proper multi-tenancy by including tenant context during conversion
+        4. Updates the in-memory cache for faster subsequent lookups
+        5. Handles duplicate key conflicts by retrying with a new UUID v7
 
         Args:
             execution: The NodeExecution domain entity to persist
@@ -334,78 +309,61 @@ class SQLAlchemyWorkflowNodeExecutionRepository(WorkflowNodeExecutionRepository)
         # Convert domain model to database model using tenant context and other attributes
         db_model = self._to_db_model(execution)
 
-        # Create a new database session
-        with self._session_factory() as session:
-            # SQLAlchemy merge intelligently handles both insert and update operations
-            # based on the presence of the primary key
-            session.merge(db_model)
-            session.commit()
+        # Use tenacity for retry logic with duplicate key handling
+        @retry(
+            stop=stop_after_attempt(3),
+            retry=retry_if_exception(self._is_duplicate_key_error),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        )
+        def _save_with_retry():
+            try:
+                self._persist_to_database(db_model)
+            except IntegrityError as e:
+                if self._is_duplicate_key_error(e):
+                    # Generate new UUID and retry
+                    self._regenerate_id_on_duplicate(execution, db_model)
+                    raise  # Let tenacity handle the retry
+                else:
+                    # Different integrity error, don't retry
+                    logger.exception("Non-duplicate key integrity error while saving workflow node execution")
+                    raise
 
-            # Update the in-memory cache for faster subsequent lookups
-            # Only cache if we have a node_execution_id to use as the cache key
+        try:
+            _save_with_retry()
+
+            # Update the in-memory cache after successful save
             if db_model.node_execution_id:
                 logger.debug("Updating cache for node_execution_id: %s", db_model.node_execution_id)
                 self._node_execution_cache[db_model.node_execution_id] = db_model
 
-    def save_execution_data(self, execution: WorkflowNodeExecution):
-        domain_model = execution
-        with self._session_factory(expire_on_commit=False) as session:
-            query = WorkflowNodeExecutionModel.preload_offload_data(select(WorkflowNodeExecutionModel)).where(
-                WorkflowNodeExecutionModel.id == domain_model.id
-            )
-            db_model: WorkflowNodeExecutionModel | None = session.execute(query).scalars().first()
+        except Exception as e:
+            logger.exception("Failed to save workflow node execution after all retries")
+            raise
 
-        if db_model is not None:
-            offload_data = db_model.offload_data
+    def _persist_to_database(self, db_model: WorkflowNodeExecutionModel) -> None:
+        """
+        Persist the database model to the database.
 
-        else:
-            db_model = self._to_db_model(domain_model)
-            offload_data = []
+        Checks if a record with the same ID exists and either updates it or creates a new one.
 
-        offload_data = db_model.offload_data
-        if domain_model.inputs is not None:
-            result = self._truncate_and_upload(
-                domain_model.inputs,
-                domain_model.id,
-                ExecutionOffLoadType.INPUTS,
-            )
-            if result is not None:
-                db_model.inputs = self._json_encode(result.truncated_value)
-                domain_model.set_truncated_inputs(result.truncated_value)
-                offload_data = _replace_or_append_offload(offload_data, result.offload)
+        Args:
+            db_model: The database model to persist
+        """
+        with self._session_factory() as session:
+            # Check if record already exists
+            existing = session.get(WorkflowNodeExecutionModel, db_model.id)
+
+            if existing:
+                # Update existing record by copying all non-private attributes
+                for key, value in db_model.__dict__.items():
+                    if not key.startswith("_"):
+                        setattr(existing, key, value)
             else:
-                db_model.inputs = self._json_encode(domain_model.inputs)
+                # Add new record
+                session.add(db_model)
 
-        if domain_model.outputs is not None:
-            result = self._truncate_and_upload(
-                domain_model.outputs,
-                domain_model.id,
-                ExecutionOffLoadType.OUTPUTS,
-            )
-            if result is not None:
-                db_model.outputs = self._json_encode(result.truncated_value)
-                domain_model.set_truncated_outputs(result.truncated_value)
-                offload_data = _replace_or_append_offload(offload_data, result.offload)
-            else:
-                db_model.outputs = self._json_encode(domain_model.outputs)
-
-        if domain_model.process_data is not None:
-            result = self._truncate_and_upload(
-                domain_model.process_data,
-                domain_model.id,
-                ExecutionOffLoadType.PROCESS_DATA,
-            )
-            if result is not None:
-                db_model.process_data = self._json_encode(result.truncated_value)
-                domain_model.set_truncated_process_data(result.truncated_value)
-                offload_data = _replace_or_append_offload(offload_data, result.offload)
-            else:
-                db_model.process_data = self._json_encode(domain_model.process_data)
-
-        db_model.offload_data = offload_data
-        with self._session_factory() as session, session.begin():
-            session.merge(db_model)
-            session.flush()
+            session.commit()
 
     def get_db_models_by_workflow_run(
         self,

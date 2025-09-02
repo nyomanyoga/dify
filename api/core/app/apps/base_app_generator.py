@@ -1,4 +1,3 @@
-import json
 from collections.abc import Generator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional, Union, final
 
@@ -175,7 +174,7 @@ class BaseAppGenerator:
             def gen():
                 for message in generator:
                     if isinstance(message, Mapping | dict):
-                        yield f"data: {json.dumps(message)}\n\n"
+                        yield f"data: {orjson_dumps(message)}\n\n"
                     else:
                         yield f"event: {message}\n\n"
 
