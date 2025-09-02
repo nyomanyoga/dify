@@ -5,10 +5,13 @@ import type { PluginDetail } from '@/app/components/plugins/types'
 import ReadmeDrawer from './index'
 
 type ReadmeDrawerContextValue = {
-  openReadme: (detail: PluginDetail) => void
+  openReadme: (detail: PluginDetail, showType?: ShowType) => void
   closeReadme: () => void
-  isOpen: boolean
-  currentDetail?: PluginDetail
+  // isOpen: boolean
+  currentDetailInfo?: {
+    detail: PluginDetail
+    showType: ShowType
+  }
 }
 
 const ReadmeDrawerContext = createContext<ReadmeDrawerContextValue | null>(null)
@@ -25,26 +28,38 @@ type ReadmeDrawerProviderProps = {
   children: ReactNode
 }
 
-export const ReadmeDrawerProvider: FC<ReadmeDrawerProviderProps> = ({ children }) => {
-  const [currentDetail, setCurrentDetail] = useState<PluginDetail | undefined>()
+enum ShowType {
+  drawer = 'drawer',
+  modal = 'modal',
+}
 
-  const openReadme = (detail: PluginDetail) => {
-    setCurrentDetail(detail)
+export const ReadmeDrawerProvider: FC<ReadmeDrawerProviderProps> = ({ children }) => {
+  const [currentDetailInfo, setCurrentDetailInfo] = useState<{
+    detail: PluginDetail
+    showType: ShowType
+  } | undefined>()
+
+  const openReadme = (detail: PluginDetail, showType?: ShowType) => {
+    setCurrentDetailInfo({
+      detail,
+      showType: showType || ShowType.drawer,
+    })
   }
 
   const closeReadme = () => {
-    setCurrentDetail(undefined)
+    setCurrentDetailInfo(undefined)
   }
 
+  // todo: use zustand
   return (
     <ReadmeDrawerContext.Provider value={{
       openReadme,
       closeReadme,
-      isOpen: !!currentDetail,
-      currentDetail,
+      // isOpen: !!currentDetailInfo,
+      currentDetailInfo,
     }}>
       {children}
-      <ReadmeDrawer detail={currentDetail} onClose={closeReadme} />
+      <ReadmeDrawer />
     </ReadmeDrawerContext.Provider>
   )
 }
