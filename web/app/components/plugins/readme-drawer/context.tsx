@@ -36,15 +36,13 @@ export const ReadmeDrawerProvider: FC<ReadmeDrawerProviderProps> = ({ children }
     setCurrentDetail(undefined)
   }
 
-  const value: ReadmeDrawerContextValue = {
-    openReadme,
-    closeReadme,
-    isOpen: !!currentDetail,
-    currentDetail,
-  }
-
   return (
-    <ReadmeDrawerContext.Provider value={value}>
+    <ReadmeDrawerContext.Provider value={{
+      openReadme,
+      closeReadme,
+      isOpen: !!currentDetail,
+      currentDetail,
+    }}>
       {children}
       <ReadmeDrawer detail={currentDetail} onClose={closeReadme} />
     </ReadmeDrawerContext.Provider>

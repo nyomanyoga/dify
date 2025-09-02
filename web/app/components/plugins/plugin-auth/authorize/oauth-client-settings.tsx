@@ -23,6 +23,7 @@ import type {
 } from '@/app/components/base/form/types'
 import { useToastContext } from '@/app/components/base/toast'
 import Button from '@/app/components/base/button'
+import { ReadmeEntrance } from '../../readme-drawer/entrance'
 
 type OAuthClientSettingsProps = {
   pluginPayload: PluginPayload
@@ -155,15 +156,14 @@ const OAuthClientSettings = ({
         )
       }
     >
-      <>
-        <AuthForm
-          formFromProps={form}
-          ref={formRef}
-          formSchemas={schemas}
-          defaultValues={editValues || defaultValues}
-          disabled={disabled}
-        />
-      </>
+      <ReadmeEntrance detail={pluginPayload.detail} />
+      <AuthForm
+        formFromProps={form}
+        ref={formRef}
+        formSchemas={schemas}
+        defaultValues={editValues || defaultValues}
+        disabled={disabled}
+      />
     </Modal>
   )
 }

@@ -10,7 +10,7 @@ import { usePluginReadme } from '@/service/use-plugins'
 import type { PluginDetail } from '@/app/components/plugins/types'
 import Loading from '@/app/components/base/loading'
 import { useLanguage } from '@/app/components/header/account-setting/model-provider-page/hooks'
-import PluginInfo from '@/app/components/plugins/plugin-info'
+import PluginTitleInfo from '@/app/components/plugins/plugin-title-info'
 
 type ReadmeDrawerProps = {
   detail?: PluginDetail
@@ -73,8 +73,7 @@ const ReadmeDrawer: FC<ReadmeDrawerProps> = ({
             </button>
           </div>
 
-          {/* Plugin Info */}
-          <PluginInfo detail={detail} size="large" />
+          <PluginTitleInfo detail={detail} size="large" />
         </div>
 
         {/* Content */}
