@@ -3,37 +3,61 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Optional, Union, cast
 
-from core.app.entities.app_invoke_entities import (
-    AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity)
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from core.app.entities.app_invoke_entities import AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity
 from core.app.entities.queue_entities import (
-    QueueAgentLogEvent, QueueIterationCompletedEvent, QueueIterationNextEvent,
-    QueueIterationStartEvent, QueueLoopCompletedEvent, QueueLoopNextEvent,
-    QueueLoopStartEvent, QueueNodeExceptionEvent, QueueNodeFailedEvent,
-    QueueNodeInIterationFailedEvent, QueueNodeInLoopFailedEvent,
-    QueueNodeRetryEvent, QueueNodeStartedEvent, QueueNodeSucceededEvent,
-    QueueParallelBranchRunFailedEvent, QueueParallelBranchRunStartedEvent,
-    QueueParallelBranchRunSucceededEvent)
+    QueueAgentLogEvent,
+    QueueIterationCompletedEvent,
+    QueueIterationNextEvent,
+    QueueIterationStartEvent,
+    QueueLoopCompletedEvent,
+    QueueLoopNextEvent,
+    QueueLoopStartEvent,
+    QueueNodeExceptionEvent,
+    QueueNodeFailedEvent,
+    QueueNodeInIterationFailedEvent,
+    QueueNodeInLoopFailedEvent,
+    QueueNodeRetryEvent,
+    QueueNodeStartedEvent,
+    QueueNodeSucceededEvent,
+    QueueParallelBranchRunFailedEvent,
+    QueueParallelBranchRunStartedEvent,
+    QueueParallelBranchRunSucceededEvent,
+)
 from core.app.entities.task_entities import (
-    AgentLogStreamResponse, IterationNodeCompletedStreamResponse,
-    IterationNodeNextStreamResponse, IterationNodeStartStreamResponse,
-    LoopNodeCompletedStreamResponse, LoopNodeNextStreamResponse,
-    LoopNodeStartStreamResponse, NodeFinishStreamResponse,
-    NodeRetryStreamResponse, NodeStartStreamResponse,
-    ParallelBranchFinishedStreamResponse, ParallelBranchStartStreamResponse,
-    WorkflowFinishStreamResponse, WorkflowStartStreamResponse)
+    AgentLogStreamResponse,
+    IterationNodeCompletedStreamResponse,
+    IterationNodeNextStreamResponse,
+    IterationNodeStartStreamResponse,
+    LoopNodeCompletedStreamResponse,
+    LoopNodeNextStreamResponse,
+    LoopNodeStartStreamResponse,
+    NodeFinishStreamResponse,
+    NodeRetryStreamResponse,
+    NodeStartStreamResponse,
+    ParallelBranchFinishedStreamResponse,
+    ParallelBranchStartStreamResponse,
+    WorkflowFinishStreamResponse,
+    WorkflowStartStreamResponse,
+)
 from core.file import FILE_MODEL_IDENTITY, File
 from core.tools.tool_manager import ToolManager
 from core.variables.segments import ArrayFileSegment, FileSegment, Segment
 from core.workflow.entities.workflow_execution import WorkflowExecution
-from core.workflow.entities.workflow_node_execution import (
-    WorkflowNodeExecution, WorkflowNodeExecutionStatus)
+from core.workflow.entities.workflow_node_execution import WorkflowNodeExecution, WorkflowNodeExecutionStatus
 from core.workflow.nodes import NodeType
 from core.workflow.nodes.tool.entities import ToolNodeData
 from core.workflow.workflow_type_encoder import WorkflowRuntimeTypeConverter
 from libs.datetime_utils import naive_utc_now
-from models import Account, EndUser
+from models import (
+    Account,
+    CreatorUserRole,
+    EndUser,
+    WorkflowRun,
+)
 from services.variable_truncator import VariableTruncator
-from sqlalchemy.orm import Session
 
 
 class WorkflowResponseConverter:
@@ -41,7 +65,6 @@ class WorkflowResponseConverter:
         self,
         *,
         application_generate_entity: Union[AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity],
-        user: Union[Account, EndUser],
     ) -> None:
         self._application_generate_entity = application_generate_entity
         self._truncator = VariableTruncator.default()
@@ -71,21 +94,27 @@ class WorkflowResponseConverter:
         workflow_execution: WorkflowExecution,
     ) -> WorkflowFinishStreamResponse:
         created_by = None
-
-        user = self._user
-        if isinstance(user, Account):
-            created_by = {
-                "id": user.id,
-                "name": user.name,
-                "email": user.email,
-            }
-        elif isinstance(user, EndUser):
-            created_by = {
-                "id": user.id,
-                "user": user.session_id,
-            }
+        workflow_run = session.scalar(select(WorkflowRun).where(WorkflowRun.id == workflow_execution.id_))
+        assert workflow_run is not None
+        if workflow_run.created_by_role == CreatorUserRole.ACCOUNT:
+            stmt = select(Account).where(Account.id == workflow_run.created_by)
+            account = session.scalar(stmt)
+            if account:
+                created_by = {
+                    "id": account.id,
+                    "name": account.name,
+                    "email": account.email,
+                }
+        elif workflow_run.created_by_role == CreatorUserRole.END_USER:
+            stmt = select(EndUser).where(EndUser.id == workflow_run.created_by)
+            end_user = session.scalar(stmt)
+            if end_user:
+                created_by = {
+                    "id": end_user.id,
+                    "user": end_user.session_id,
+                }
         else:
-            raise NotImplementedError(f"User type not supported: {type(user)}")
+            raise NotImplementedError(f"unknown created_by_role: {workflow_run.created_by_role}")
 
         # Handle the case where finished_at is None by using current time as default
         finished_at_timestamp = (

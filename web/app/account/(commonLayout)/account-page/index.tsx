@@ -69,6 +69,7 @@ export default function AccountPage() {
     }
     catch (e) {
       notify({ type: 'error', message: (e as Error).message })
+      setEditNameModalVisible(false)
       setEditing(false)
     }
   }

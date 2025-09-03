@@ -229,7 +229,7 @@ class ExternalDatasetService:
 
     @staticmethod
     def get_external_knowledge_api_settings(settings: dict) -> ExternalKnowledgeApiSetting:
-        return ExternalKnowledgeApiSetting.model_validate(settings)
+        return ExternalKnowledgeApiSetting.parse_obj(settings)
 
     @staticmethod
     def create_external_dataset(tenant_id: str, user_id: str, args: dict) -> Dataset:

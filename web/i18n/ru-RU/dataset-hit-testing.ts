@@ -2,6 +2,7 @@ const translation = {
   title: 'Тестирование поиска',
   desc: 'Проверьте эффективность поиска в базе знаний на основе заданного текста запроса.',
   dateTimeFormat: 'DD.MM.YYYY HH:mm',
+  recents: 'Недавние',
   table: {
     header: {
       source: 'Источник',

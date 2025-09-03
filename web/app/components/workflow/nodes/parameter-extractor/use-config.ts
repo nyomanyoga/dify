@@ -155,6 +155,7 @@ const useConfig = (id: string, payload: ParameterExtractorNodeType) => {
       return
     setModelChanged(false)
     handleVisionConfigAfterModelChanged()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisionModel, modelChanged])
 
   const {

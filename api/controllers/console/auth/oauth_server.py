@@ -2,17 +2,16 @@ from functools import wraps
 from typing import cast
 
 import flask_login
-from controllers.console.wraps import (account_initialization_required,
-                                       setup_required)
-from core.model_runtime.utils.encoders import jsonable_encoder
 from flask import request
 from flask_restx import Resource, reqparse
+from werkzeug.exceptions import BadRequest, NotFound
+
+from controllers.console.wraps import account_initialization_required, setup_required
+from core.model_runtime.utils.encoders import jsonable_encoder
 from libs.login import login_required
 from models.account import Account
 from models.model import OAuthProviderApp
-from services.oauth_server import (OAUTH_ACCESS_TOKEN_EXPIRES_IN,
-                                   OAuthGrantType, OAuthServerService)
-from werkzeug.exceptions import BadRequest, NotFound
+from services.oauth_server import OAUTH_ACCESS_TOKEN_EXPIRES_IN, OAuthGrantType, OAuthServerService
 
 from .. import api
 

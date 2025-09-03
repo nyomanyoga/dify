@@ -48,7 +48,7 @@ By default we will use `LanguagesSupported` to determine which languages are sup
 
 ```
 cd web/i18n
-cp -r en-US id-ID
+cp -r en-US fr-FR
 ```
 
 2. Modify the translation files in the new folder.
@@ -68,8 +68,6 @@ export type I18nText = {
   'ru-RU': string
   'it-IT': string
   'uk-UA': string
-  'id-ID': string
-  'tr-TR': string
   'YOUR_LANGUAGE_CODE': string
 }
 ```
@@ -148,8 +146,8 @@ export const languages = [
   {
     value: 'id-ID',
     name: 'Bahasa Indonesia',
-    example: 'Halo, Dify!',
-    supported: true,
+    example: 'Saluto, Dify!',
+    supported: false,
   },
   {
     value: 'uk-UA',

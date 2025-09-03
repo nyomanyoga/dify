@@ -20,7 +20,6 @@ from qdrant_client.http.models import (
 )
 from qdrant_client.local.qdrant_local import QdrantLocal
 from requests.auth import HTTPDigestAuth
-from sqlalchemy import select
 
 from configs import dify_config
 from core.rag.datasource.vdb.field import Field
@@ -352,7 +351,7 @@ class TidbOnQdrantVector(BaseVector):
             metadata = result.payload.get(Field.METADATA_KEY.value) or {}
             # duplicate check score threshold
             score_threshold = kwargs.get("score_threshold") or 0.0
-            if result.score >= score_threshold:
+            if result.score > score_threshold:
                 metadata["score"] = result.score
                 doc = Document(
                     page_content=result.payload.get(Field.CONTENT_KEY.value, ""),
@@ -417,12 +416,16 @@ class TidbOnQdrantVector(BaseVector):
 
 class TidbOnQdrantVectorFactory(AbstractVectorFactory):
     def init_vector(self, dataset: Dataset, attributes: list, embeddings: Embeddings) -> TidbOnQdrantVector:
-        stmt = select(TidbAuthBinding).where(TidbAuthBinding.tenant_id == dataset.tenant_id)
-        tidb_auth_binding = db.session.scalars(stmt).one_or_none()
+        tidb_auth_binding = (
+            db.session.query(TidbAuthBinding).where(TidbAuthBinding.tenant_id == dataset.tenant_id).one_or_none()
+        )
         if not tidb_auth_binding:
             with redis_client.lock("create_tidb_serverless_cluster_lock", timeout=900):
-                stmt = select(TidbAuthBinding).where(TidbAuthBinding.tenant_id == dataset.tenant_id)
-                tidb_auth_binding = db.session.scalars(stmt).one_or_none()
+                tidb_auth_binding = (
+                    db.session.query(TidbAuthBinding)
+                    .where(TidbAuthBinding.tenant_id == dataset.tenant_id)
+                    .one_or_none()
+                )
                 if tidb_auth_binding:
                     TIDB_ON_QDRANT_API_KEY = f"{tidb_auth_binding.account}:{tidb_auth_binding.password}"
 

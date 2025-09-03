@@ -175,6 +175,7 @@ export const MarketplaceContextProvider = ({
         })
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryPlugins, queryMarketplaceCollectionsAndPlugins, isSuccess, exclude])
 
   const handleQueryMarketplaceCollectionsAndPlugins = useCallback(() => {

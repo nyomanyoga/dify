@@ -5,7 +5,7 @@ import cn from '@/utils/classnames'
 
 export type TRadioGroupProps = {
   children?: ReactNode | ReactNode[]
-  value?: string | number | boolean
+  value?: string | number
   className?: string
   onChange?: (value: any) => void
 }

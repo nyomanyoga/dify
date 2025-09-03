@@ -175,6 +175,7 @@ const ConfigContent: FC<Props> = ({
       ...datasetConfigs,
       reranking_enable: enable,
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRerankModel, datasetConfigs, onChange])
 
   return (

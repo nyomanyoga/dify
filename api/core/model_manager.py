@@ -158,6 +158,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, LargeLanguageModel):
             raise Exception("Model type instance is not LargeLanguageModel")
+
+        self.model_type_instance = cast(LargeLanguageModel, self.model_type_instance)
         return cast(
             Union[LLMResult, Generator],
             self._round_robin_invoke(
@@ -186,6 +188,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, LargeLanguageModel):
             raise Exception("Model type instance is not LargeLanguageModel")
+
+        self.model_type_instance = cast(LargeLanguageModel, self.model_type_instance)
         return cast(
             int,
             self._round_robin_invoke(
@@ -210,6 +214,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, TextEmbeddingModel):
             raise Exception("Model type instance is not TextEmbeddingModel")
+
+        self.model_type_instance = cast(TextEmbeddingModel, self.model_type_instance)
         return cast(
             TextEmbeddingResult,
             self._round_robin_invoke(
@@ -231,6 +237,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, TextEmbeddingModel):
             raise Exception("Model type instance is not TextEmbeddingModel")
+
+        self.model_type_instance = cast(TextEmbeddingModel, self.model_type_instance)
         return cast(
             list[int],
             self._round_robin_invoke(
@@ -261,6 +269,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, RerankModel):
             raise Exception("Model type instance is not RerankModel")
+
+        self.model_type_instance = cast(RerankModel, self.model_type_instance)
         return cast(
             RerankResult,
             self._round_robin_invoke(
@@ -285,6 +295,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, ModerationModel):
             raise Exception("Model type instance is not ModerationModel")
+
+        self.model_type_instance = cast(ModerationModel, self.model_type_instance)
         return cast(
             bool,
             self._round_robin_invoke(
@@ -306,6 +318,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, Speech2TextModel):
             raise Exception("Model type instance is not Speech2TextModel")
+
+        self.model_type_instance = cast(Speech2TextModel, self.model_type_instance)
         return cast(
             str,
             self._round_robin_invoke(
@@ -329,6 +343,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, TTSModel):
             raise Exception("Model type instance is not TTSModel")
+
+        self.model_type_instance = cast(TTSModel, self.model_type_instance)
         return cast(
             Iterable[bytes],
             self._round_robin_invoke(
@@ -388,6 +404,8 @@ class ModelInstance:
         """
         if not isinstance(self.model_type_instance, TTSModel):
             raise Exception("Model type instance is not TTSModel")
+
+        self.model_type_instance = cast(TTSModel, self.model_type_instance)
         return self.model_type_instance.get_tts_model_voices(
             model=self.model, credentials=self.credentials, language=language
         )

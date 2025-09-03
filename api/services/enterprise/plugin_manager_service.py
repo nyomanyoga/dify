@@ -37,8 +37,8 @@ class PluginManagerService:
             ret = EnterprisePluginManagerRequest.send_request(
                 "POST", "/check-credential-policy-compliance", json=body.model_dump()
             )
-            if not isinstance(ret, dict) or "result" not in ret:
-                raise ValueError("Invalid response format from plugin manager API")
+            if not isinstance(ret, dict):
+                raise
         except Exception as e:
             raise CredentialPolicyViolationError(
                 f"error occurred while checking credential policy compliance: {e}"

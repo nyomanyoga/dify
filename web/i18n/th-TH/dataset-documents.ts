@@ -31,6 +31,7 @@ const translation = {
       sync: 'ซิงค์',
       pause: 'หยุด',
       resume: 'ดำเนิน',
+      download: 'ดาวน์โหลดไฟล์',
     },
     index: {
       enable: 'เปิด',
@@ -341,6 +342,7 @@ const translation = {
     keywords: 'คําสําคัญ',
     addKeyWord: 'เพิ่มคําสําคัญ',
     keywordError: 'ความยาวสูงสุดของคําหลักคือ 20',
+    characters: 'อักขระ',
     hitCount: 'จํานวนการดึงข้อมูล',
     vectorHash: 'แฮชเวกเตอร์:',
     questionPlaceholder: 'เพิ่มคําถามที่นี่',

@@ -98,6 +98,7 @@ const Action: FC<Props> = ({
       hideDeleteConfirm()
       onDelete()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [installationId, onDelete])
   return (
     <div className='flex space-x-1'>

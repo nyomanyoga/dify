@@ -39,9 +39,6 @@ class TencentConfig(BaseModel):
         return {"url": self.url, "username": self.username, "key": self.api_key, "timeout": self.timeout}
 
 
-bm25 = BM25Encoder.default("zh")
-
-
 class TencentVector(BaseVector):
     field_id: str = "id"
     field_vector: str = "vector"
@@ -56,6 +53,7 @@ class TencentVector(BaseVector):
         self._dimension = 1024
         self._init_database()
         self._load_collection()
+        self._bm25 = BM25Encoder.default("zh")
 
     def _load_collection(self):
         """
@@ -188,7 +186,7 @@ class TencentVector(BaseVector):
                     metadata=metadata,
                 )
                 if self._enable_hybrid_search:
-                    doc.__dict__["sparse_vector"] = bm25.encode_texts(texts[i])
+                    doc.__dict__["sparse_vector"] = self._bm25.encode_texts(texts[i])
                 docs.append(doc)
             self._client.upsert(
                 database_name=self._client_config.database,
@@ -266,7 +264,7 @@ class TencentVector(BaseVector):
             match=[
                 KeywordSearch(
                     field_name="sparse_vector",
-                    data=bm25.encode_queries(query),
+                    data=self._bm25.encode_queries(query),
                 ),
             ],
             rerank=WeightedRerank(
@@ -293,7 +291,7 @@ class TencentVector(BaseVector):
                 score = 1 - result.get("score", 0.0)
             else:
                 score = result.get("score", 0.0)
-            if score >= score_threshold:
+            if score > score_threshold:
                 meta["score"] = score
                 doc = Document(page_content=result.get(self.field_text), metadata=meta)
                 docs.append(doc)

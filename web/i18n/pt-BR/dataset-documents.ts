@@ -30,6 +30,7 @@ const translation = {
       sync: 'Sincronizar',
       resume: 'Retomar',
       pause: 'Pausa',
+      download: 'Baixar arquivo',
     },
     index: {
       enable: 'Habilitar',
@@ -342,6 +343,7 @@ const translation = {
     keywords: 'Palavras-chave',
     addKeyWord: 'Adicionar palavra-chave',
     keywordError: 'O comprimento máximo da palavra-chave é 20',
+    characters: 'caracteres',
     hitCount: 'Contagem de recuperação',
     vectorHash: 'Hash do vetor: ',
     questionPlaceholder: 'adicionar pergunta aqui',

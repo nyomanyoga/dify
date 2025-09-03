@@ -32,7 +32,6 @@ export enum FormTypeEnum {
   multiToolSelector = 'array[tools]',
   appSelector = 'app-selector',
   dynamicSelect = 'dynamic-select',
-  boolean = 'boolean',
 }
 
 export type FormOption = {
@@ -70,10 +69,10 @@ export type GetValuesOptions = {
   needCheckValidatedValues?: boolean
 }
 export type FormRefObject = {
-  getForm: () => AnyFormApi
-  getFormValues: (obj: GetValuesOptions) => {
-    values: Record<string, any>
-    isCheckValidated: boolean
-  }
+    getForm: () => AnyFormApi
+    getFormValues: (obj: GetValuesOptions) => {
+      values: Record<string, any>
+      isCheckValidated: boolean
+    }
 }
 export type FormRef = ForwardedRef<FormRefObject>

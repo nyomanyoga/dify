@@ -22,6 +22,7 @@ export const HooksStoreContextProvider = ({ children, ...restProps }: HooksStore
   useEffect(() => {
     if (storeRef.current && d3Selection && d3Zoom)
       storeRef.current.getState().refreshAll(restProps)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d3Selection, d3Zoom])
 
   if (!storeRef.current)

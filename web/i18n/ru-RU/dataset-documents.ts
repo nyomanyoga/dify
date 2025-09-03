@@ -31,6 +31,7 @@ const translation = {
       sync: 'Синхронизировать',
       resume: 'Возобновить',
       pause: 'Пауза',
+      download: 'Скачать файл',
     },
     index: {
       enable: 'Включить',
@@ -342,6 +343,7 @@ const translation = {
     keywords: 'Ключевые слова',
     addKeyWord: 'Добавить ключевое слово',
     keywordError: 'Максимальная длина ключевого слова - 20',
+    characters: 'символов',
     hitCount: 'Количество обращений',
     vectorHash: 'Векторный хэш: ',
     questionPlaceholder: 'добавьте вопрос здесь',

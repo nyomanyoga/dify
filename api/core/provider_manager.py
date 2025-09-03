@@ -2,7 +2,7 @@ import contextlib
 import json
 from collections import defaultdict
 from json import JSONDecodeError
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -154,8 +154,8 @@ class ProviderManager:
         for provider_entity in provider_entities:
             # handle include, exclude
             if is_filtered(
-                include_set=dify_config.POSITION_PROVIDER_INCLUDES_SET,
-                exclude_set=dify_config.POSITION_PROVIDER_EXCLUDES_SET,
+                include_set=cast(set[str], dify_config.POSITION_PROVIDER_INCLUDES_SET),
+                exclude_set=cast(set[str], dify_config.POSITION_PROVIDER_EXCLUDES_SET),
                 data=provider_entity,
                 name_func=lambda x: x.provider,
             ):
@@ -276,11 +276,15 @@ class ProviderManager:
         :param model_type: model type
         :return:
         """
-        stmt = select(TenantDefaultModel).where(
-            TenantDefaultModel.tenant_id == tenant_id,
-            TenantDefaultModel.model_type == model_type.to_origin_model_type(),
+        # Get the corresponding TenantDefaultModel record
+        default_model = (
+            db.session.query(TenantDefaultModel)
+            .where(
+                TenantDefaultModel.tenant_id == tenant_id,
+                TenantDefaultModel.model_type == model_type.to_origin_model_type(),
+            )
+            .first()
         )
-        default_model = db.session.scalar(stmt)
 
         # If it does not exist, get the first available provider model from get_configurations
         # and update the TenantDefaultModel record
@@ -363,11 +367,16 @@ class ProviderManager:
         model_names = [model.model for model in available_models]
         if model not in model_names:
             raise ValueError(f"Model {model} does not exist.")
-        stmt = select(TenantDefaultModel).where(
-            TenantDefaultModel.tenant_id == tenant_id,
-            TenantDefaultModel.model_type == model_type.to_origin_model_type(),
+
+        # Get the list of available models from get_configurations and check if it is LLM
+        default_model = (
+            db.session.query(TenantDefaultModel)
+            .where(
+                TenantDefaultModel.tenant_id == tenant_id,
+                TenantDefaultModel.model_type == model_type.to_origin_model_type(),
+            )
+            .first()
         )
-        default_model = db.session.scalar(stmt)
 
         # create or update TenantDefaultModel record
         if default_model:
@@ -609,13 +618,16 @@ class ProviderManager:
                             provider_name_to_provider_records_dict[provider_name].append(new_provider_record)
                         except IntegrityError:
                             db.session.rollback()
-                            stmt = select(Provider).where(
-                                Provider.tenant_id == tenant_id,
-                                Provider.provider_name == ModelProviderID(provider_name).provider_name,
-                                Provider.provider_type == ProviderType.SYSTEM.value,
-                                Provider.quota_type == ProviderQuotaType.TRIAL.value,
+                            existed_provider_record = (
+                                db.session.query(Provider)
+                                .where(
+                                    Provider.tenant_id == tenant_id,
+                                    Provider.provider_name == ModelProviderID(provider_name).provider_name,
+                                    Provider.provider_type == ProviderType.SYSTEM.value,
+                                    Provider.quota_type == ProviderQuotaType.TRIAL.value,
+                                )
+                                .first()
                             )
-                            existed_provider_record = db.session.scalar(stmt)
                             if not existed_provider_record:
                                 continue
 

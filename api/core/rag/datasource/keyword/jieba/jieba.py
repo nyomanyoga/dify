@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 import orjson
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from configs import dify_config
 from core.rag.datasource.keyword.jieba.jieba_keyword_table_handler import JiebaKeywordTableHandler
@@ -212,10 +211,11 @@ class Jieba(BaseKeyword):
         return sorted_chunk_indices[:k]
 
     def _update_segment_keywords(self, dataset_id: str, node_id: str, keywords: list[str]):
-        stmt = select(DocumentSegment).where(
-            DocumentSegment.dataset_id == dataset_id, DocumentSegment.index_node_id == node_id
+        document_segment = (
+            db.session.query(DocumentSegment)
+            .where(DocumentSegment.dataset_id == dataset_id, DocumentSegment.index_node_id == node_id)
+            .first()
         )
-        document_segment = db.session.scalar(stmt)
         if document_segment:
             document_segment.keywords = keywords
             db.session.add(document_segment)

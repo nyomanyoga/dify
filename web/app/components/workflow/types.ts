@@ -458,7 +458,6 @@ export enum VersionHistoryContextMenuOptions {
   restore = 'restore',
   edit = 'edit',
   delete = 'delete',
-  exportDSL = 'exportDSL',
   copyId = 'copyId',
 }
 

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.ops.entities.config_entity import BaseTracingConfig
@@ -45,15 +44,14 @@ class BaseTraceInstance(ABC):
         """
         with Session(db.engine, expire_on_commit=False) as session:
             # Get the app to find its creator
-            app_stmt = select(App).where(App.id == app_id)
-            app = session.scalar(app_stmt)
+            app = session.query(App).where(App.id == app_id).first()
             if not app:
                 raise ValueError(f"App with id {app_id} not found")
 
             if not app.created_by:
                 raise ValueError(f"App with id {app_id} has no creator (created_by is None)")
-            account_stmt = select(Account).where(Account.id == app.created_by)
-            service_account = session.scalar(account_stmt)
+
+            service_account = session.query(Account).where(Account.id == app.created_by).first()
             if not service_account:
                 raise ValueError(f"Creator account with id {app.created_by} not found for app {app_id}")
 

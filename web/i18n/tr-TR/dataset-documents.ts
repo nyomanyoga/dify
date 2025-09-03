@@ -31,6 +31,7 @@ const translation = {
       sync: 'Senkronize et',
       pause: 'Duraklat',
       resume: 'Devam Et',
+      download: 'Dosyayı İndir',
     },
     index: {
       enable: 'Etkinleştir',
@@ -341,6 +342,7 @@ const translation = {
     keywords: 'Anahtar Kelimeler',
     addKeyWord: 'Anahtar kelime ekle',
     keywordError: 'Anahtar kelimenin maksimum uzunluğu 20',
+    characters: 'karakter',
     hitCount: 'Geri alım sayısı',
     vectorHash: 'Vektör hash: ',
     questionPlaceholder: 'soruyu buraya ekleyin',

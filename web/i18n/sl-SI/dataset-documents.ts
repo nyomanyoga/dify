@@ -31,6 +31,7 @@ const translation = {
       sync: 'Sinhroniziraj',
       pause: 'Zaustavi',
       resume: 'Nadaljuj',
+      download: 'Prenesi datoteko',
     },
     index: {
       enable: 'Omogoči',
@@ -342,6 +343,7 @@ const translation = {
     keywords: 'Ključne besede',
     addKeyWord: 'Dodaj ključno besedo',
     keywordError: 'Največja dolžina ključne besede je 20',
+    characters: 'znakov',
     hitCount: 'Število pridobitev',
     vectorHash: 'Vektorski hash: ',
     questionPlaceholder: 'dodajte vprašanje tukaj',

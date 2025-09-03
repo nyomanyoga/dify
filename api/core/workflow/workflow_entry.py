@@ -2,7 +2,7 @@ import logging
 import time
 import uuid
 from collections.abc import Generator, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from configs import dify_config
 from core.app.apps.exc import GenerateTaskStoppedError
@@ -261,6 +261,7 @@ class WorkflowEntry:
             environment_variables=[],
         )
 
+        node_cls = cast(type[BaseNode], node_cls)
         # init workflow run state
         node: BaseNode = node_cls(
             id=str(uuid.uuid4()),

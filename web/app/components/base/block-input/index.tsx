@@ -3,7 +3,7 @@
 import type { ChangeEvent, FC } from 'react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import VarHighlight from '../../app/configuration/base/var-highlight'
+import { varHighlightHTML } from '../../app/configuration/base/var-highlight'
 import Toast from '../toast'
 import classNames from '@/utils/classnames'
 import { checkKeys } from '@/utils/var'
@@ -66,24 +66,11 @@ const BlockInput: FC<IBlockInputProps> = ({
     'block-input--editing': isEditing,
   })
 
-  const renderSafeContent = (value: string) => {
-    const parts = value.split(/(\{\{[^}]+\}\}|\n)/g)
-    return parts.map((part, index) => {
-      const variableMatch = part.match(/^\{\{([^}]+)\}\}$/)
-      if (variableMatch) {
-        return (
-          <VarHighlight
-            key={`var-${index}`}
-            name={variableMatch[1]}
-          />
-        )
-      }
-      if (part === '\n')
-        return <br key={`br-${index}`} />
-
-      return <span key={`text-${index}`}>{part}</span>
-    })
-  }
+  const coloredContent = (currentValue || '')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(regex, varHighlightHTML({ name: '$1' })) // `<span class="${highLightClassName}">{{$1}}</span>`
+    .replace(/\n/g, '<br />')
 
   // Not use useCallback. That will cause out callback get old data.
   const handleSubmit = (value: string) => {
@@ -109,11 +96,11 @@ const BlockInput: FC<IBlockInputProps> = ({
 
   // Prevent rerendering caused cursor to jump to the start of the contentEditable element
   const TextAreaContentView = () => {
-    return (
-      <div className={classNames(style, className)}>
-        {renderSafeContent(currentValue || '')}
-      </div>
-    )
+    return <div
+      className={classNames(style, className)}
+      dangerouslySetInnerHTML={{ __html: coloredContent }}
+      suppressContentEditableWarning={true}
+    />
   }
 
   const placeholder = ''

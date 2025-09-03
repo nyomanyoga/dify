@@ -91,8 +91,8 @@ const ParameterItem: FC<ParameterItemProps> = ({
     numberInputRef.current!.value = `${num}`
   }
 
-  const handleRadioChange = (v: boolean) => {
-    handleInputChange(v)
+  const handleRadioChange = (v: number) => {
+    handleInputChange(v === 1)
   }
 
   const handleStringInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -187,11 +187,11 @@ const ParameterItem: FC<ParameterItemProps> = ({
       return (
         <Radio.Group
           className='flex w-[178px] items-center'
-          value={renderValue as boolean}
+          value={renderValue ? 1 : 0}
           onChange={handleRadioChange}
         >
-          <Radio value={true} className='w-[83px]'>True</Radio>
-          <Radio value={false} className='w-[83px]'>False</Radio>
+          <Radio value={1} className='w-[83px]'>True</Radio>
+          <Radio value={0} className='w-[83px]'>False</Radio>
         </Radio.Group>
       )
     }
@@ -236,7 +236,6 @@ const ParameterItem: FC<ParameterItemProps> = ({
             onChange={handleTagChange}
             customizedConfirmKey='Tab'
             isInWorkflow={isInWorkflow}
-            required={parameterRule.required}
           />
         </div>
       )

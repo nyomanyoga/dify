@@ -674,7 +674,7 @@ class TestAnnotationService:
 
         history = (
             db.session.query(AppAnnotationHitHistory)
-            .where(
+            .filter(
                 AppAnnotationHitHistory.annotation_id == annotation.id, AppAnnotationHitHistory.message_id == message_id
             )
             .first()

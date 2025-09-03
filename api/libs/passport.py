@@ -14,11 +14,11 @@ class PassportService:
     def verify(self, token):
         try:
             return jwt.decode(token, self.sk, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
+        except jwt.exceptions.ExpiredSignatureError:
             raise Unauthorized("Token has expired.")
-        except jwt.InvalidSignatureError:
+        except jwt.exceptions.InvalidSignatureError:
             raise Unauthorized("Invalid token signature.")
-        except jwt.DecodeError:
+        except jwt.exceptions.DecodeError:
             raise Unauthorized("Invalid token.")
-        except jwt.PyJWTError:  # Catch-all for other JWT errors
+        except jwt.exceptions.PyJWTError:  # Catch-all for other JWT errors
             raise Unauthorized("Invalid token.")

@@ -1,6 +1,8 @@
 const translation = {
   steps: {
     header: {
+      creation: 'Ustvari Znanje',
+      update: 'Dodaj podatke',
       fallbackRoute: 'Znanje',
     },
     one: 'Izberi vir podatkov',

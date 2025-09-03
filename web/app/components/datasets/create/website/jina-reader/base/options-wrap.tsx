@@ -29,6 +29,7 @@ const OptionsWrap: FC<Props> = ({
   useEffect(() => {
     if (controlFoldOptions)
       foldHide()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controlFoldOptions])
   return (
     <div className={cn(className, !fold ? 'mb-0' : 'mb-3')}>

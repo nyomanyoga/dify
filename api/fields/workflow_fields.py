@@ -17,7 +17,7 @@ class EnvironmentVariableField(fields.Raw):
             return {
                 "id": value.id,
                 "name": value.name,
-                "value": encrypter.full_mask_token(),
+                "value": encrypter.obfuscated_token(value.value),
                 "value_type": value.value_type.value,
                 "description": value.description,
             }

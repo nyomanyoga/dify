@@ -1,5 +1,5 @@
 import React from 'react'
-import cn from 'classnames'
+import clsx from 'clsx'
 import usePagination from './hook'
 import type {
   ButtonProps,
@@ -45,7 +45,7 @@ export const PrevButton = ({
     <as.type
       {...buttonProps}
       {...as.props}
-      className={cn(className, as.props.className)}
+      className={clsx(className, as.props.className)}
       onClick={() => previous()}
       tabIndex={disabled ? '-1' : 0}
       disabled={disabled}
@@ -80,7 +80,7 @@ export const NextButton = ({
     <as.type
       {...buttonProps}
       {...as.props}
-      className={cn(className, as.props.className)}
+      className={clsx(className, as.props.className)}
       onClick={() => next()}
       tabIndex={disabled ? '-1' : 0}
       disabled={disabled}
@@ -132,7 +132,7 @@ export const PageButton = ({
     <li key={page}>
       <as.type
         data-testid={
-          cn({
+          clsx({
             [`${dataTestIdActive}`]:
               dataTestIdActive && pagination.currentPage + 1 === page,
             [`${dataTestIdInactive}-${page}`]:
@@ -145,7 +145,7 @@ export const PageButton = ({
             pagination.setCurrentPage(page - 1)
         }}
         onClick={() => pagination.setCurrentPage(page - 1)}
-        className={cn(
+        className={clsx(
           className,
           pagination.currentPage + 1 === page
             ? activeClassName

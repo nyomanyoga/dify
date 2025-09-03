@@ -1,9 +1,7 @@
 import json
 import logging
 from collections.abc import Generator
-from typing import Any, Optional
-
-from sqlalchemy import select
+from typing import Any, Optional, cast
 
 from core.file import FILE_MODEL_IDENTITY, File, FileTransferMethod
 from core.tools.__base.tool import Tool
@@ -138,8 +136,7 @@ class WorkflowTool(Tool):
                 .first()
             )
         else:
-            stmt = select(Workflow).where(Workflow.app_id == app_id, Workflow.version == version)
-            workflow = db.session.scalar(stmt)
+            workflow = db.session.query(Workflow).where(Workflow.app_id == app_id, Workflow.version == version).first()
 
         if not workflow:
             raise ValueError("workflow not found or not published")
@@ -150,8 +147,7 @@ class WorkflowTool(Tool):
         """
         get the app by app id
         """
-        stmt = select(App).where(App.id == app_id)
-        app = db.session.scalar(stmt)
+        app = db.session.query(App).where(App.id == app_id).first()
         if not app:
             raise ValueError("app not found")
 
@@ -208,14 +204,14 @@ class WorkflowTool(Tool):
                         item = self._update_file_mapping(item)
                         file = build_from_mapping(
                             mapping=item,
-                            tenant_id=str(self.runtime.tenant_id),
+                            tenant_id=str(cast(ToolRuntime, self.runtime).tenant_id),
                         )
                         files.append(file)
             elif isinstance(value, dict) and value.get("dify_model_identity") == FILE_MODEL_IDENTITY:
                 value = self._update_file_mapping(value)
                 file = build_from_mapping(
                     mapping=value,
-                    tenant_id=str(self.runtime.tenant_id),
+                    tenant_id=str(cast(ToolRuntime, self.runtime).tenant_id),
                 )
                 files.append(file)
 

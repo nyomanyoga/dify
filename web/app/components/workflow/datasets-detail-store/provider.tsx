@@ -40,6 +40,7 @@ const DatasetsDetailProvider: FC<DatasetsDetailProviderProps> = ({
     }, [])
     if (allDatasetIds.length === 0) return
     updateDatasetsDetail(allDatasetIds)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

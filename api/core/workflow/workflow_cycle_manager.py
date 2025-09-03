@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, Union
+from uuid import uuid4
 
 from core.app.entities.app_invoke_entities import AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity
 from core.app.entities.queue_entities import (
@@ -28,7 +29,6 @@ from core.workflow.repositories.workflow_node_execution_repository import Workfl
 from core.workflow.system_variable import SystemVariable
 from core.workflow.workflow_entry import WorkflowEntry
 from libs.datetime_utils import naive_utc_now
-from libs.uuid_utils import uuidv7
 
 
 @dataclass
@@ -270,7 +270,7 @@ class WorkflowCycleManager:
         """Get execution ID from system variables or generate a new one."""
         if self._workflow_system_variables and self._workflow_system_variables.workflow_execution_id:
             return str(self._workflow_system_variables.workflow_execution_id)
-        return str(uuidv7())
+        return str(uuid4())
 
     def _save_and_cache_workflow_execution(self, execution: WorkflowExecution) -> WorkflowExecution:
         """Save workflow execution to repository and cache it."""
@@ -378,7 +378,7 @@ class WorkflowCycleManager:
         }
 
         domain_execution = WorkflowNodeExecution(
-            id=str(uuidv7()),
+            id=str(uuid4()),
             workflow_id=workflow_execution.workflow_id,
             workflow_execution_id=workflow_execution.id_,
             predecessor_node_id=event.predecessor_node_id,

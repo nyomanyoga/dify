@@ -51,6 +51,7 @@ const useConfig = (id: string, payload: HttpNodeType) => {
       setInputs(newInputs)
       setIsDataReady(true)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultConfig])
 
   const handleMethodChange = useCallback((method: Method) => {

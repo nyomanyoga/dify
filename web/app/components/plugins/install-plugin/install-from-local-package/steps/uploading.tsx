@@ -55,6 +55,7 @@ const Uploading: FC<Props> = ({
 
   React.useEffect(() => {
     handleUpload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return (
     <>

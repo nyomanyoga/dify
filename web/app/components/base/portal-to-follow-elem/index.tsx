@@ -4,7 +4,6 @@ import {
   FloatingPortal,
   autoUpdate,
   flip,
-  hide,
   offset,
   shift,
   size,
@@ -40,7 +39,7 @@ export function usePortalToFollowElem({
   triggerPopupSameWidth,
 }: PortalToFollowElemOptions = {}) {
   const setOpen = setControlledOpen
-  const container = document.getElementById('workflow-container') || document.body
+
   const data = useFloating({
     placement,
     open,
@@ -51,17 +50,9 @@ export function usePortalToFollowElem({
       flip({
         crossAxis: placement.includes('-'),
         fallbackAxisSideDirection: 'start',
-        padding: 8,
+        padding: 5,
       }),
-      shift({
-        padding: 8,
-        boundary: container,
-        altBoundary: true,
-      }),
-      hide({
-        // hide when the reference element is not visible
-        boundary: container,
-      }),
+      shift({ padding: 5 }),
       size({
         apply({ rects, elements }) {
           if (triggerPopupSameWidth)
@@ -142,9 +133,9 @@ export const PortalToFollowElemTrigger = (
       context.getReferenceProps({
         ref,
         ...props,
-        ...(children.props || {}),
+        ...children.props,
         'data-state': context.open ? 'open' : 'closed',
-      } as React.HTMLProps<HTMLElement>),
+      }),
     )
   }
 
@@ -186,7 +177,6 @@ export const PortalToFollowElemContent = (
         style={{
           ...context.floatingStyles,
           ...style,
-          visibility: context.middlewareData.hide?.referenceHidden ? 'hidden' : 'visible',
         }}
         {...context.getFloatingProps(props)}
       />

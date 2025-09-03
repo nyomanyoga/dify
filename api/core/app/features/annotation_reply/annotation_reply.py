@@ -1,8 +1,6 @@
 import logging
 from typing import Optional
 
-from sqlalchemy import select
-
 from core.app.entities.app_invoke_entities import InvokeFrom
 from core.rag.datasource.vdb.vector_factory import Vector
 from extensions.ext_database import db
@@ -27,8 +25,9 @@ class AnnotationReplyFeature:
         :param invoke_from: invoke from
         :return:
         """
-        stmt = select(AppAnnotationSetting).where(AppAnnotationSetting.app_id == app_record.id)
-        annotation_setting = db.session.scalar(stmt)
+        annotation_setting = (
+            db.session.query(AppAnnotationSetting).where(AppAnnotationSetting.app_id == app_record.id).first()
+        )
 
         if not annotation_setting:
             return None

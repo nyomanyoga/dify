@@ -30,6 +30,7 @@ const translation = {
       sync: 'Sincronizează',
       pause: 'Pauză',
       resume: 'Reia',
+      download: 'Descărcați fișierul',
     },
     index: {
       enable: 'Activează',
@@ -342,6 +343,7 @@ const translation = {
     keywords: 'Cuvinte cheie',
     addKeyWord: 'Adăugați un cuvânt cheie',
     keywordError: 'Lungimea maximă a cuvântului cheie este de 20 de caractere',
+    characters: 'caractere',
     hitCount: 'Număr de rezultate',
     vectorHash: 'Vector hash: ',
     questionPlaceholder: 'adăugați întrebarea aici',

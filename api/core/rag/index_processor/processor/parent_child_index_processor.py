@@ -130,16 +130,13 @@ class ParentChildIndexProcessor(BaseIndexProcessor):
                 if delete_child_chunks:
                     db.session.query(ChildChunk).where(
                         ChildChunk.dataset_id == dataset.id, ChildChunk.index_node_id.in_(child_node_ids)
-                    ).delete(synchronize_session=False)
+                    ).delete()
                     db.session.commit()
             else:
                 vector.delete()
 
                 if delete_child_chunks:
-                    # Use existing compound index: (tenant_id, dataset_id, ...)
-                    db.session.query(ChildChunk).where(
-                        ChildChunk.tenant_id == dataset.tenant_id, ChildChunk.dataset_id == dataset.id
-                    ).delete(synchronize_session=False)
+                    db.session.query(ChildChunk).where(ChildChunk.dataset_id == dataset.id).delete()
                     db.session.commit()
 
     def retrieve(
@@ -165,7 +162,7 @@ class ParentChildIndexProcessor(BaseIndexProcessor):
         for result in results:
             metadata = result.metadata
             metadata["score"] = result.score
-            if result.score >= score_threshold:
+            if result.score > score_threshold:
                 doc = Document(page_content=result.page_content, metadata=metadata)
                 docs.append(doc)
         return docs

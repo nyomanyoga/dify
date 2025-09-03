@@ -141,6 +141,7 @@ const MCPDetailContent: FC<Props> = ({
   useEffect(() => {
     if (isTriggerAuthorize)
       handleAuthorize()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!detail)

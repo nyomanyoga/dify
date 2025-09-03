@@ -2,6 +2,7 @@ const translation = {
   title: 'آزمون بازیابی',
   desc: 'آزمون اثرگذاری دانش بر اساس متن پرسش داده شده.',
   dateTimeFormat: 'MM/DD/YYYY hh:mm A',
+  recents: 'اخیرها',
   table: {
     header: {
       source: 'منبع',

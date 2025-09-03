@@ -3,7 +3,7 @@ from collections.abc import Generator
 from datetime import date, datetime
 from decimal import Decimal
 from mimetypes import guess_extension
-from typing import Optional
+from typing import Optional, cast
 from uuid import UUID
 
 import numpy as np
@@ -159,7 +159,8 @@ class ToolFileMessageTransformer:
 
             elif message.type == ToolInvokeMessage.MessageType.JSON:
                 if isinstance(message.message, ToolInvokeMessage.JsonMessage):
-                    message.message.json_object = safe_json_value(message.message.json_object)
+                    json_msg = cast(ToolInvokeMessage.JsonMessage, message.message)
+                    json_msg.json_object = safe_json_value(json_msg.json_object)
                 yield message
             else:
                 yield message

@@ -72,9 +72,7 @@ class AdvancedChatAppRunner(WorkflowBasedAppRunner):
         app_config = self.application_generate_entity.app_config
         app_config = cast(AdvancedChatAppConfig, app_config)
 
-        with Session(db.engine, expire_on_commit=False) as session:
-            app_record = session.scalar(select(App).where(App.id == app_config.app_id))
-
+        app_record = db.session.query(App).where(App.id == app_config.app_id).first()
         if not app_record:
             raise ValueError("App not found")
 
@@ -142,7 +140,7 @@ class AdvancedChatAppRunner(WorkflowBasedAppRunner):
                 environment_variables=self._workflow.environment_variables,
                 # Based on the definition of `VariableUnion`,
                 # `list[Variable]` can be safely used as `list[VariableUnion]` since they are compatible.
-                conversation_variables=conversation_variables,
+                conversation_variables=cast(list[VariableUnion], conversation_variables),
             )
 
             # init graph

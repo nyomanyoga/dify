@@ -140,6 +140,7 @@ const useConfig = (id: string, payload: ToolNodeType) => {
       return
     const inputsWithDefaultValue = formattingParameters()
     setInputs(inputsWithDefaultValue)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currTool])
 
   // setting when call

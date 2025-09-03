@@ -56,6 +56,7 @@ const List = forwardRef<ListRef, ListProps>(({
 
   useEffect(() => {
     handleScroll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list])
 
   const handleHeadClick = () => {

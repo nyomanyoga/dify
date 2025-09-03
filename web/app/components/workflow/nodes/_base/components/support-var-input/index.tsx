@@ -2,7 +2,7 @@
 import type { FC } from 'react'
 import React from 'react'
 import cn from '@/utils/classnames'
-import VarHighlight from '@/app/components/app/configuration/base/var-highlight'
+import { varHighlightHTML } from '@/app/components/app/configuration/base/var-highlight'
 type Props = {
   isFocus?: boolean
   onFocus?: () => void
@@ -22,24 +22,11 @@ const SupportVarInput: FC<Props> = ({
   textClassName,
   readonly,
 }) => {
-  const renderSafeContent = (inputValue: string) => {
-    const parts = inputValue.split(/(\{\{[^}]+\}\}|\n)/g)
-    return parts.map((part, index) => {
-      const variableMatch = part.match(/^\{\{([^}]+)\}\}$/)
-      if (variableMatch) {
-        return (
-          <VarHighlight
-            key={`var-${index}`}
-            name={variableMatch[1]}
-          />
-        )
-      }
-      if (part === '\n')
-        return <br key={`br-${index}`} />
-
-      return <span key={`text-${index}`}>{part}</span>
-    })
-  }
+  const withHightContent = (value || '')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\{\{([^}]+)\}\}/g, varHighlightHTML({ name: '$1', className: '!mb-0' })) // `<span class="${highLightClassName}">{{$1}}</span>`
+    .replace(/\n/g, '<br />')
 
   return (
     <div
@@ -55,9 +42,9 @@ const SupportVarInput: FC<Props> = ({
           <div
             className={cn(textClassName, 'h-full w-0 grow truncate whitespace-nowrap')}
             title={value}
-          >
-            {renderSafeContent(value || '')}
-          </div>
+            dangerouslySetInnerHTML={{
+              __html: withHightContent,
+            }}></div>
         )}
     </div>
   )

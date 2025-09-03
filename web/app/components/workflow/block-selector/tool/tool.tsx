@@ -122,6 +122,7 @@ const Tool: FC<Props> = ({
     }
     if (!hasSearchText && !isFold)
       setFold(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasSearchText])
 
   const FoldIcon = isFold ? RiArrowRightSLine : RiArrowDownSLine
