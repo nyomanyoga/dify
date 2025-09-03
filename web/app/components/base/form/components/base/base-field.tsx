@@ -42,7 +42,6 @@ const BaseField = ({
     placeholder,
     options,
     labelClassName: formLabelClassName,
-    show_on = [],
     disabled: formSchemaDisabled,
   } = formSchema
   const disabled = propsDisabled || formSchemaDisabled
@@ -92,26 +91,11 @@ const BaseField = ({
     }) || []
   }, [options, renderI18nObject, optionValues])
   const value = useStore(field.form.store, s => s.values[field.name])
-  const values = useStore(field.form.store, (s) => {
-    return show_on.reduce((acc, condition) => {
-      acc[condition.variable] = s.values[condition.variable]
-      return acc
-    }, {} as Record<string, any>)
-  })
-  const show = useMemo(() => {
-    return show_on.every((condition) => {
-      const conditionValue = values[condition.variable]
-      return conditionValue === condition.value
-    })
-  }, [values, show_on])
 
   const handleChange = useCallback((value: any) => {
     field.handleChange(value)
     onChange?.(field.name, value)
   }, [field, onChange])
-
-  if (!show)
-    return null
 
   return (
     <div className={cn(fieldClassName)}>
@@ -179,6 +163,9 @@ const BaseField = ({
               placeholder={memorizedPlaceholder}
               options={memorizedOptions}
               triggerPopupSameWidth
+              popupProps={{
+                className: 'max-h-[320px] overflow-y-auto',
+              }}
             />
           )
         }

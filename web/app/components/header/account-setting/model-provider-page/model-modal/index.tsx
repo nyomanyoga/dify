@@ -245,6 +245,8 @@ const ModelModal: FC<ModelModalProps> = ({
     return null
   }, [model, provider, mode, renderI18nObject])
 
+  const notAllowCustomCredential = provider.allow_custom_token === false
+
   const showCredentialLabel = useMemo(() => {
     if (mode === ModelModalModeEnum.configCustomModel)
       return true
@@ -315,6 +317,7 @@ const ModelModal: FC<ModelModalProps> = ({
                     onSelect={setSelectedCredential}
                     selectedCredential={selectedCredential}
                     disabled={isLoading}
+                    notAllowAddNewCredential={notAllowCustomCredential}
                   />
                 )
               }

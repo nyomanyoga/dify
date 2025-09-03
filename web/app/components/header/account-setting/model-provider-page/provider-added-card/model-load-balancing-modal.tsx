@@ -27,6 +27,7 @@ import {
 } from '@/service/use-models'
 import { useAuth } from '../model-auth/hooks/use-auth'
 import Confirm from '@/app/components/base/confirm'
+import { useRefreshModel } from '../hooks'
 
 export type ModelLoadBalancingModalProps = {
   provider: ModelProvider
@@ -139,6 +140,7 @@ const ModelLoadBalancingModal = ({
     }
   }, [current_credential_id, current_credential_name])
   const [customModelCredential, setCustomModelCredential] = useState<Credential | undefined>(initialCustomModelCredential)
+  const { handleRefreshModel } = useRefreshModel()
   const handleSave = async () => {
     try {
       setLoading(true)
@@ -157,6 +159,7 @@ const ModelLoadBalancingModal = ({
       )
       if (res.result === 'success') {
         notify({ type: 'success', message: t('common.actionMsg.modifiedSuccessfully') })
+        handleRefreshModel(provider, configurateMethod, currentCustomConfigurationModelFixedFields)
         onSave?.(provider.provider)
         onClose?.()
       }
@@ -277,8 +280,8 @@ const ModelLoadBalancingModal = ({
                     <div className='grow'>
                       <div className='text-sm text-text-secondary'>{
                         providerFormSchemaPredefined
-                        ? t('common.modelProvider.auth.providerManaged')
-                        : t('common.modelProvider.auth.specifyModelCredential')
+                          ? t('common.modelProvider.auth.providerManaged')
+                          : t('common.modelProvider.auth.specifyModelCredential')
                       }</div>
                       <div className='text-xs text-text-tertiary'>{
                         providerFormSchemaPredefined
