@@ -1,3 +1,14 @@
+import Button from '@/app/components/base/button'
+import Confirm from '@/app/components/base/confirm'
+import Loading from '@/app/components/base/loading'
+import Modal from '@/app/components/base/modal'
+import { useToastContext } from '@/app/components/base/toast'
+import { SwitchCredentialInLoadBalancing } from '@/app/components/header/account-setting/model-provider-page/model-auth'
+import {
+  useGetModelCredential,
+  useUpdateModelLoadBalancingConfig,
+} from '@/service/use-models'
+import classNames from '@/utils/classnames'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -12,21 +23,10 @@ import {
   ConfigurationMethodEnum,
   FormTypeEnum,
 } from '../declarations'
+import { useAuth } from '../model-auth/hooks/use-auth'
 import ModelIcon from '../model-icon'
 import ModelName from '../model-name'
 import ModelLoadBalancingConfigs from './model-load-balancing-configs'
-import classNames from '@/utils/classnames'
-import Modal from '@/app/components/base/modal'
-import Button from '@/app/components/base/button'
-import Loading from '@/app/components/base/loading'
-import { useToastContext } from '@/app/components/base/toast'
-import { SwitchCredentialInLoadBalancing } from '@/app/components/header/account-setting/model-provider-page/model-auth'
-import {
-  useGetModelCredential,
-  useUpdateModelLoadBalancingConfig,
-} from '@/service/use-models'
-import { useAuth } from '../model-auth/hooks/use-auth'
-import Confirm from '@/app/components/base/confirm'
 
 export type ModelLoadBalancingModalProps = {
   provider: ModelProvider
@@ -277,8 +277,8 @@ const ModelLoadBalancingModal = ({
                     <div className='grow'>
                       <div className='text-sm text-text-secondary'>{
                         providerFormSchemaPredefined
-                        ? t('common.modelProvider.auth.providerManaged')
-                        : t('common.modelProvider.auth.specifyModelCredential')
+                          ? t('common.modelProvider.auth.providerManaged')
+                          : t('common.modelProvider.auth.specifyModelCredential')
                       }</div>
                       <div className='text-xs text-text-tertiary'>{
                         providerFormSchemaPredefined

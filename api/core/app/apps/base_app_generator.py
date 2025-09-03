@@ -1,21 +1,17 @@
-import json
 from collections.abc import Generator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional, Union, final
-
-from sqlalchemy.orm import Session
 
 from core.app.app_config.entities import VariableEntityType
 from core.app.entities.app_invoke_entities import InvokeFrom
 from core.file import File, FileUploadConfig
 from core.workflow.nodes.enums import NodeType
 from core.workflow.repositories.draft_variable_repository import (
-    DraftVariableSaver,
-    DraftVariableSaverFactory,
-    NoopDraftVariableSaver,
-)
+    DraftVariableSaver, DraftVariableSaverFactory, NoopDraftVariableSaver)
 from factories import file_factory
 from models import Account, EndUser
-from services.workflow_draft_variable_service import DraftVariableSaver as DraftVariableSaverImpl
+from services.workflow_draft_variable_service import \
+    DraftVariableSaver as DraftVariableSaverImpl
+from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
     from core.app.app_config.entities import VariableEntity
@@ -175,7 +171,7 @@ class BaseAppGenerator:
             def gen():
                 for message in generator:
                     if isinstance(message, Mapping | dict):
-                        yield f"data: {json.dumps(message)}\n\n"
+                        yield f"data: {orjson_dumps(message)}\n\n"
                     else:
                         yield f"event: {message}\n\n"
 

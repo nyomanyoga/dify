@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import sqlalchemy as sa
 from pydantic import TypeAdapter
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from yarl import URL
 
@@ -202,14 +203,11 @@ class ToolManager:
                 # get specific credentials
                 if is_valid_uuid(credential_id):
                     try:
-                        builtin_provider = (
-                            db.session.query(BuiltinToolProvider)
-                            .where(
-                                BuiltinToolProvider.tenant_id == tenant_id,
-                                BuiltinToolProvider.id == credential_id,
-                            )
-                            .first()
+                        builtin_provider_stmt = select(BuiltinToolProvider).where(
+                            BuiltinToolProvider.tenant_id == tenant_id,
+                            BuiltinToolProvider.id == credential_id,
                         )
+                        builtin_provider = db.session.scalar(builtin_provider_stmt)
                     except Exception as e:
                         builtin_provider = None
                         logger.info("Error getting builtin provider %s:%s", credential_id, e, exc_info=True)
@@ -244,14 +242,7 @@ class ToolManager:
                     raise ToolProviderNotFoundError(f"builtin provider {provider_id} not found")
 
             # check if the credential is allowed to be used
-            if FeatureService.get_system_features().plugin_manager.enabled:
-                PluginManagerService.check_credential_policy_compliance(
-                    CheckCredentialPolicyComplianceRequest(
-                        dify_credential_id=builtin_provider.id,
-                        provider=provider_id,
-                        credential_type=PluginCredentialType.TOOL,
-                    )
-                )
+            cls._check_credential_policy_compliance(builtin_provider.id, provider_id)
 
             encrypter, cache = create_provider_encrypter(
                 tenant_id=tenant_id,
@@ -331,11 +322,10 @@ class ToolManager:
                 ),
             )
         elif provider_type == ToolProviderType.WORKFLOW:
-            workflow_provider = (
-                db.session.query(WorkflowToolProvider)
-                .where(WorkflowToolProvider.tenant_id == tenant_id, WorkflowToolProvider.id == provider_id)
-                .first()
+            workflow_provider_stmt = select(WorkflowToolProvider).where(
+                WorkflowToolProvider.tenant_id == tenant_id, WorkflowToolProvider.id == provider_id
             )
+            workflow_provider = db.session.scalar(workflow_provider_stmt)
 
             if workflow_provider is None:
                 raise ToolProviderNotFoundError(f"workflow provider {provider_id} not found")
@@ -345,16 +335,13 @@ class ToolManager:
             if controller_tools is None or len(controller_tools) == 0:
                 raise ToolProviderNotFoundError(f"workflow provider {provider_id} not found")
 
-            return cast(
-                WorkflowTool,
-                controller.get_tools(tenant_id=workflow_provider.tenant_id)[0].fork_tool_runtime(
-                    runtime=ToolRuntime(
-                        tenant_id=tenant_id,
-                        credentials={},
-                        invoke_from=invoke_from,
-                        tool_invoke_from=tool_invoke_from,
-                    )
-                ),
+            return controller.get_tools(tenant_id=workflow_provider.tenant_id)[0].fork_tool_runtime(
+                runtime=ToolRuntime(
+                    tenant_id=tenant_id,
+                    credentials={},
+                    invoke_from=invoke_from,
+                    tool_invoke_from=tool_invoke_from,
+                )
             )
         elif provider_type == ToolProviderType.APP:
             raise NotImplementedError("app provider not implemented")
@@ -662,8 +649,8 @@ class ToolManager:
                 for provider in builtin_providers:
                     # handle include, exclude
                     if is_filtered(
-                        include_set=cast(set[str], dify_config.POSITION_TOOL_INCLUDES_SET),
-                        exclude_set=cast(set[str], dify_config.POSITION_TOOL_EXCLUDES_SET),
+                        include_set=dify_config.POSITION_TOOL_INCLUDES_SET,
+                        exclude_set=dify_config.POSITION_TOOL_EXCLUDES_SET,
                         data=provider,
                         name_func=lambda x: x.identity.name,
                     ):
@@ -1039,6 +1026,23 @@ class ToolManager:
                     value = parameter.init_frontend_parameter(tool_configurations.get(parameter.name))
                     runtime_parameters[parameter.name] = value
         return runtime_parameters
+
+    @classmethod
+    def _check_credential_policy_compliance(cls, credential_id: str, provider: str) -> None:
+        """
+        Check credential policy compliance for the given credential ID.
+
+        :param credential_id: The credential ID to check
+        :param provider: The provider name
+        """
+        if FeatureService.get_system_features().plugin_manager.enabled:
+            PluginManagerService.check_credential_policy_compliance(
+                CheckCredentialPolicyComplianceRequest(
+                    dify_credential_id=credential_id,
+                    provider=provider,
+                    credential_type=PluginCredentialType.TOOL,
+                )
+            )
 
 
 ToolManager.load_hardcoded_providers_cache()

@@ -1,11 +1,3 @@
-import {
-  memo,
-  useCallback,
-} from 'react'
-import { RiAddLine } from '@remixicon/react'
-import { useTranslation } from 'react-i18next'
-import { Authorized } from '@/app/components/header/account-setting/model-provider-page/model-auth'
-import cn from '@/utils/classnames'
 import type {
   Credential,
   CustomConfigurationModelFixedFields,
@@ -14,6 +6,14 @@ import type {
   ModelProvider,
 } from '@/app/components/header/account-setting/model-provider-page/declarations'
 import { ConfigurationMethodEnum, ModelModalModeEnum } from '@/app/components/header/account-setting/model-provider-page/declarations'
+import { Authorized } from '@/app/components/header/account-setting/model-provider-page/model-auth'
+import cn from '@/utils/classnames'
+import { RiAddLine } from '@remixicon/react'
+import {
+  memo,
+  useCallback,
+} from 'react'
+import { useTranslation } from 'react-i18next'
 
 type AddCredentialInLoadBalancingProps = {
   provider: ModelProvider
@@ -51,7 +51,7 @@ const AddCredentialInLoadBalancing = ({
         open && 'bg-state-base-hover',
       )}>
         <RiAddLine className='mr-2 h-4 w-4' />
-       {t('common.modelProvider.auth.addCredential')}
+        {t('common.modelProvider.auth.addCredential')}
       </div>
     )
 

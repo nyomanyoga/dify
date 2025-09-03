@@ -9,9 +9,12 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, TypeVar, Union
 
+import psycopg2.errors
 from sqlalchemy import UnaryExpression, asc, desc, select
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
+from tenacity import before_sleep_log, retry, retry_if_exception, stop_after_attempt
 
 from configs import dify_config
 from core.model_runtime.utils.encoders import jsonable_encoder
@@ -334,15 +337,30 @@ class SQLAlchemyWorkflowNodeExecutionRepository(WorkflowNodeExecutionRepository)
         # Convert domain model to database model using tenant context and other attributes
         db_model = self._to_db_model(execution)
 
-        # Create a new database session
-        with self._session_factory() as session:
-            # SQLAlchemy merge intelligently handles both insert and update operations
-            # based on the presence of the primary key
-            session.merge(db_model)
-            session.commit()
+        # Use tenacity for retry logic with duplicate key handling
+        @retry(
+            stop=stop_after_attempt(3),
+            retry=retry_if_exception(self._is_duplicate_key_error),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        )
+        def _save_with_retry():
+            try:
+                self._persist_to_database(db_model)
+            except IntegrityError as e:
+                if self._is_duplicate_key_error(e):
+                    # Generate new UUID and retry
+                    self._regenerate_id_on_duplicate(execution, db_model)
+                    raise  # Let tenacity handle the retry
+                else:
+                    # Different integrity error, don't retry
+                    logger.exception("Non-duplicate key integrity error while saving workflow node execution")
+                    raise
 
-            # Update the in-memory cache for faster subsequent lookups
-            # Only cache if we have a node_execution_id to use as the cache key
+        try:
+            _save_with_retry()
+
+            # Update the in-memory cache after successful save
             if db_model.node_execution_id:
                 logger.debug("Updating cache for node_execution_id: %s", db_model.node_execution_id)
                 self._node_execution_cache[db_model.node_execution_id] = db_model
