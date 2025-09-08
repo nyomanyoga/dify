@@ -607,6 +607,11 @@ services:
     networks:
       - ssrf_proxy_network
       - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # worker service
   # The Celery worker for processing the queue.
