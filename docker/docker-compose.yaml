@@ -656,7 +656,9 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:1.8.1
+    build:
+      context: ../web
+      dockerfile: Dockerfile
     restart: always
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
@@ -680,6 +682,9 @@ services:
       ENABLE_WEBSITE_JINAREADER: ${ENABLE_WEBSITE_JINAREADER:-true}
       ENABLE_WEBSITE_FIRECRAWL: ${ENABLE_WEBSITE_FIRECRAWL:-true}
       ENABLE_WEBSITE_WATERCRAWL: ${ENABLE_WEBSITE_WATERCRAWL:-true}
+    depends_on:
+      api:
+        condition: service_healthy
   # The postgres database.
   db:
     image: postgres:15-alpine
